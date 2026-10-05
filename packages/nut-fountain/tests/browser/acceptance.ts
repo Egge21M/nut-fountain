@@ -3,6 +3,7 @@ import * as fountain from 'nut-fountain';
 import { FountainEncoder, FountainDecoder } from 'nut-fountain/core';
 import { tokenToBytes, bytesToToken, bytesToTokenString } from 'nut-fountain/cashu';
 import { UrDecoder } from 'nut-fountain/ur';
+import { AutoDecoder } from 'nut-fountain/auto';
 import { encodeBase64Url, decodeBase64Url, encodeCbor, decodeCbor } from 'nut-fountain/encoding';
 import vectors from '../fixtures/urkit.json';
 
@@ -67,15 +68,26 @@ export function runAcceptance(fixtures: Fixtures): string[] {
   equivalent(fountain.bytesToToken(roundTrip(fountain.tokenToBytes(object))), object);
   passed.push('cashu-ts Token with large Amount and full keyset ID -> binary fountain -> token');
 
-  for (const fixture of fixtures.ur) {
-    const reader = new UrDecoder();
+  const auto = new AutoDecoder();
+  assert(fountain.AutoDecoder === AutoDecoder, 'root and subpath automatic exports must match');
+  const automaticEncoder = new FountainEncoder(bytes, { fragmentSize: 128 });
+  for (let i = 0; i < automaticEncoder.fragmentCount; i++) auto.receive(automaticEncoder.nextFrame());
+  assert(auto.format === 'binary' && auto.progress === 1, 'automatic binary progress');
+  assert(auto.result?.every((value, i) => value === bytes[i]), 'automatic exact binary bytes');
+  auto.reset();
+  assert(auto.format === undefined && !auto.isComplete && auto.result === undefined, 'automatic reset');
+  passed.push('automatic public decoder binary bytes and reset');
+
+  for (const fixture of fixtures.ur) for (const automatic of [false, true]) {
+    const reader = automatic ? new AutoDecoder() : new UrDecoder();
     for (const part of fixture.parts) {
-      reader.receive(part);
+      if (reader instanceof AutoDecoder && part === part.toUpperCase()) reader.receive(new TextEncoder().encode(part));
+      else reader.receive(part);
       if (reader.isComplete) break;
     }
     assert(reader.isComplete, `${fixture.label} must finish`);
     equivalent(bytesToToken(reader.result!), expected);
-    passed.push(`${fixture.label} -> token`);
+    passed.push(`${automatic ? 'automatic: ' : ''}${fixture.label} -> token`);
   }
   for (const [label, parts, hex] of [
     ['single', [vectors.single], vectors.singlePayloadHex],

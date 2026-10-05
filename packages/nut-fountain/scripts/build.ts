@@ -2,7 +2,7 @@ import { rm } from 'node:fs/promises';
 
 await rm('dist', { recursive: true, force: true });
 const result = await Bun.build({
-  entrypoints: ['src/index.ts', 'src/core.ts', 'src/cashu.ts', 'src/ur.ts', 'src/encoding.ts'],
+  entrypoints: ['src/index.ts', 'src/core.ts', 'src/cashu.ts', 'src/ur.ts', 'src/encoding.ts', 'src/auto.ts'],
   outdir: 'dist',
   target: 'browser',
   format: 'esm',

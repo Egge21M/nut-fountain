@@ -40,6 +40,10 @@
     "./encoding": {
       "types": "./dist/encoding.d.ts",
       "import": "./dist/encoding.js"
+    },
+    "./auto": {
+      "types": "./dist/auto.d.ts",
+      "import": "./dist/auto.js"
     }
   },
   "files": [

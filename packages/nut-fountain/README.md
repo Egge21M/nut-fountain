@@ -21,6 +21,34 @@ bun run test:browser
 
 The [validation record](docs/validation.md) lists versions, commands, and coverage. No npm publication is part of this experiment.
 
+## Choose a decoder
+
+| Decoder | Accepted input | Import |
+| --- | --- | --- |
+| `FountainDecoder` | Only our binary fountain frames (`Uint8Array`) | `nut-fountain/core` |
+| `UrDecoder` | Only complete `ur:bytes` strings | `nut-fountain/ur` |
+| `AutoDecoder` | Binary fountain frames or UR text, including UR encoded as scanned bytes | `nut-fountain/auto` |
+
+All three are also exported from `nut-fountain`. The scoped decoders keep their existing behavior; the automatic router is optional. Importing `nut-fountain/core` still avoids UR and Cashu dependencies.
+
+```ts
+import { AutoDecoder } from 'nut-fountain/auto';
+import { bytesToTokenString } from 'nut-fountain/cashu';
+
+const decoder = new AutoDecoder();
+function onScan(scanned: Uint8Array | string) {
+  decoder.receive(scanned);
+  console.log(decoder.format, decoder.progress); // 'binary' | 'ur' | undefined; 0–1
+  if (decoder.isComplete) return bytesToTokenString(decoder.result!);
+}
+// Before receiving another transfer:
+decoder.reset();
+```
+
+`AutoDecoder` selects its format only after an accepted frame. `format` is `undefined` before then and after `reset()`. It exposes `isComplete`, defensive-copy `result`, `independentFrames`, `fragmentCount`, and `progress` from the selected decoder. Results are arbitrary payload bytes; Cashu interpretation remains in the Cashu helpers. The router recognizes fountain framing, not bare tokens, base64-wrapped binary frames, or arbitrary text encodings.
+
+It handles one transfer at a time. Call `reset()` to switch transfers or formats. Unknown prefixes return `false` without selecting a format. Once selected, a different format throws. Within the selected format, validation and `receive()` return values follow the scoped decoder: binary errors throw and `true` means a new independent equation; UR rejects invalid/foreign parts with `false` and `true` means a newly accepted part (possibly dependent). Invalid UTF-8 in UR byte input throws. Use `progress` and `isComplete`, rather than counting `true` returns. Failed UR message reconstruction clears UR progress but keeps the router's format selection until `reset()`.
+
 ## Arbitrary bytes
 
 ```ts
@@ -116,6 +144,7 @@ The supported convention is `ur:bytes` carrying a CBOR byte string whose payload
 | `nut-fountain/core` | `FountainEncoder`, `FountainDecoder` |
 | `nut-fountain/cashu` | `tokenToBytes`, `bytesToToken`, `bytesToTokenString`, type `Token` |
 | `nut-fountain/ur` | `UrDecoder` |
+| `nut-fountain/auto` | `AutoDecoder`, type `DecoderFormat` |
 | `nut-fountain/encoding` | `encodeCbor`, `decodeCbor`, `encodeBase64Url`, `decodeBase64Url` |
 | `nut-fountain` | All of the above |
 

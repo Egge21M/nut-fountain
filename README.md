@@ -33,7 +33,7 @@ PLAYGROUND_ALLOWED_HOSTS=your-development-host.example bun run dev
 
 You can also use **Next frame** on the sender and import screenshots with **Import QR images** on the receiver. Image import does not require camera permission or HTTPS.
 
-Tokens are processed locally, without uploads, storage, or mint calls. The app reads the scanner's binary data directly; it does not encode fountain frames as base64, UTF-8 text, or UR. The device reader also automatically accepts single-part and animated `ur:bytes` QR codes carrying UTF-8 `cashuB` strings or `crawB` binary tokens. Camera scanning and image import use the same decoder, with progress for both formats. Reset the reader before switching transfers. Sending still uses only the new binary format.
+Tokens are processed locally, without uploads, storage, or mint calls. The app reads the scanner's binary data directly; it does not encode fountain frames as base64, UTF-8 text, or UR. The device reader also automatically accepts single-part and animated `ur:bytes` QR codes carrying UTF-8 `cashuB` strings or `crawB` binary tokens. Camera scanning and image import use the package’s public `AutoDecoder`, with progress for both formats. Applications can instead select the scoped `FountainDecoder` or `UrDecoder`. Reset the reader before switching transfers. Sending still uses only the new binary format.
 
 ## Validate and build
 

@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { FountainEncoder, FountainDecoder } from 'nut-fountain/core';
 import { createFrameQr, readQrPixels } from '../src/qr';
 import QRCode from 'qrcode';
-import { TransferReader } from '../src/reader';
+import { AutoDecoder } from 'nut-fountain/auto';
 import { bytesToToken, bytesToTokenString, tokenToBytes } from 'nut-fountain/cashu';
 import { makeDemoToken } from '../src/demo';
 import { urParts } from './ur-fixtures';
@@ -51,7 +51,7 @@ for (const binary of [false, true]) for (const mode of ['single', 'multipart', '
   test(`scanner auto-detects ${mode} UR carrying ${binary ? 'crawB' : 'cashuB text'}`, () => {
     const payload = binary ? tokenToBytes(token) : new TextEncoder().encode(token);
     const parts = urParts(payload, mode === 'single' ? 4096 : 40, mode === 'repairs');
-    const reader = new TransferReader();
+    const reader = new AutoDecoder();
     // Invalid UR cannot lock the format or poison the transfer.
     expect(reader.receive(new TextEncoder().encode('ur:bytes/zz'))).toBe(false);
     expect(reader.format).toBeUndefined();
@@ -67,7 +67,7 @@ for (const binary of [false, true]) for (const mode of ['single', 'multipart', '
       expect(reader.progress).toBe(before);
       expect(reader.progress === 1).toBe(reader.isComplete);
     }
-    expect(reader.format).toBe('UR');
+    expect(reader.format).toBe('ur');
     expect(reader.isComplete).toBe(true);
     expect(bytesToTokenString(reader.result!)).toBe(token);
   });
@@ -75,7 +75,7 @@ for (const binary of [false, true]) for (const mode of ['single', 'multipart', '
 
 test('scanner preserves binary bytes and keeps active formats separate until reset', () => {
   const sender = new FountainEncoder(tokenToBytes(token), { fragmentSize: 40 });
-  let reader = new TransferReader();
+  let reader = new AutoDecoder();
   reader.receive(scan(createFrameQr(sender.nextFrame())));
   const before = reader.progress;
   const ur = scan(QRCode.create(urParts(new TextEncoder().encode(token), 4096)[0]!));
@@ -83,8 +83,8 @@ test('scanner preserves binary bytes and keeps active formats separate until res
   expect(reader.progress).toBe(before);
   while (!reader.isComplete) reader.receive(scan(createFrameQr(sender.nextFrame())));
   expect(bytesToTokenString(reader.result!)).toBe(token);
-  reader = new TransferReader();
+  reader = new AutoDecoder();
   reader.receive(ur);
-  expect(reader.format).toBe('UR');
+  expect(reader.format).toBe('ur');
   expect(bytesToTokenString(reader.result!)).toBe(token);
 });
