@@ -22,12 +22,32 @@ for (const [name, payload] of [
     if ((parts.length > 1) !== multipart) throw new Error('Unexpected reference fixture size');
     fixtures.ur.push({ label: `${multipart ? 'multipart' : 'single-part'} UR ${name}`, parts });
   }
+  const repairEncoder = new UREncoder(UR.fromBuffer(Buffer.from(payload)), 32);
+  for (let i = 0; i < repairEncoder.fragmentsLength; i++) repairEncoder.nextPart();
+  const repairs = Array.from({ length: repairEncoder.fragmentsLength * 6 + 20 }, () => repairEncoder.nextPart())
+    .filter((_, i) => i % 3 !== 0).reverse();
+  fixtures.ur.push({
+    label: `repair-only UR ${name} with loss, reordering, duplicates and malformed input`,
+    parts: ['ur:bytes/zz', ...repairs.flatMap(part => [part, part.toUpperCase()])],
+  });
 }
 
+const forbiddenRuntimeDependencies = new Set<string>();
 const build = await Bun.build({
   entrypoints: ['tests/browser/acceptance.ts'], target: 'browser', format: 'esm',
+  plugins: [{ name: 'production-runtime-boundary', setup(build) {
+    build.onResolve({ filter: /.*/ }, args => {
+      if (/^(@gandlaf21\/bc-ur|buffer|jsbi|bignumber\.js|@apocentre\/alias-sampling)(\/|$)/.test(args.path)) {
+        forbiddenRuntimeDependencies.add(args.path);
+      }
+      return undefined;
+    });
+  } }],
 });
 if (!build.success) throw new AggregateError(build.logs, 'Browser consumer build failed');
+if (forbiddenRuntimeDependencies.size) {
+  throw new Error(`Development-only dependencies in browser runtime: ${[...forbiddenRuntimeDependencies].join(', ')}`);
+}
 const bundle = await build.outputs[0]!.text();
 const server = Bun.serve({
   hostname: '127.0.0.1', port: 0,

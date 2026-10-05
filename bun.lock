@@ -6,10 +6,11 @@
       "name": "nut-fountain",
       "dependencies": {
         "@cashu/cashu-ts": "4.11.0",
-        "@gandlaf21/bc-ur": "1.1.12",
+        "@noble/hashes": "2.4.0",
         "cborg": "4.3.2",
       },
       "devDependencies": {
+        "@gandlaf21/bc-ur": "1.1.12",
         "@types/bun": "latest",
         "buffer": "6.0.3",
         "playwright": "1.63.0",

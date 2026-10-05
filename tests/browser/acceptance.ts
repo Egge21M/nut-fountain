@@ -4,6 +4,7 @@ import { FountainEncoder, FountainDecoder } from 'nut-fountain/core';
 import { tokenToBytes, bytesToToken, bytesToTokenString } from 'nut-fountain/cashu';
 import { UrDecoder } from 'nut-fountain/ur';
 import { encodeBase64Url, decodeBase64Url, encodeCbor, decodeCbor } from 'nut-fountain/encoding';
+import vectors from '../fixtures/urkit.json';
 
 export interface Fixtures {
   cashuB: string;
@@ -75,6 +76,18 @@ export function runAcceptance(fixtures: Fixtures): string[] {
     assert(reader.isComplete, `${fixture.label} must finish`);
     equivalent(bytesToToken(reader.result!), expected);
     passed.push(`${fixture.label} -> token`);
+  }
+  for (const [label, parts, hex] of [
+    ['single', [vectors.single], vectors.singlePayloadHex],
+    ['multipart', [vectors.parts[3]!, vectors.parts[4]!, ...vectors.parts.slice(9).reverse()], vectors.payloadHex],
+  ] as const) {
+    const reader = new UrDecoder();
+    assert(!reader.receive('ur:bytes/zz'), 'malformed Bytewords must be rejected');
+    for (const part of parts) reader.receive(part);
+    const expectedBytes = Uint8Array.from(hex.match(/../g)!, byte => parseInt(byte, 16));
+    const actual = reader.result;
+    assert(actual?.length === expectedBytes.length && actual.every((byte, i) => byte === expectedBytes[i]), `URKit ${label} vector`);
+    passed.push(`published URKit ${label} vector`);
   }
   const encoded = encodeCbor('browser');
   assert(decodeCbor(decodeBase64Url(encodeBase64Url(encoded))) === 'browser', 'encoding helper exports');

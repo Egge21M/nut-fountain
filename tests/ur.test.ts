@@ -6,6 +6,33 @@ import bytewords from '@gandlaf21/bc-ur/dist/lib/es6/bytewords.js';
 import { UrDecoder } from '../src/ur.ts';
 
 describe('existing UR input', () => {
+  test('rejects malformed parts during an active transfer without discarding good data', () => {
+    const payload = Uint8Array.from({ length: 200 }, (_, i) => i);
+    const reference = new UREncoder(UR.fromBuffer(Buffer.from(payload)), 40);
+    const parts = Array.from({ length: reference.fragmentsLength }, () => reference.nextPart());
+    const reader = new UrDecoder();
+    expect(reader.receive(parts[0]!)).toBe(true);
+    const second = parts[1]!;
+    const invalid = [second + 'a', second + '/aa', second.replace('/2-', '/1-'),
+      second.replace('/2-', '/02-'), second.replace('ur:bytes/', 'ur:crypto-seed/'), 'ur:bytes/zz'];
+    for (const part of invalid) expect(reader.receive(part)).toBe(false);
+    for (const part of parts.slice(1)) reader.receive(part);
+    expect(reader.result).toEqual(payload);
+  });
+
+  test('supports UR transfers larger than the custom binary fragment-count limit', () => {
+    const payload = Uint8Array.from({ length: 4096 }, (_, i) => i % 256);
+    const reference = new UREncoder(UR.fromBuffer(Buffer.from(payload)), 10);
+    expect(reference.fragmentsLength).toBeGreaterThan(256);
+    const reader = new UrDecoder();
+    for (let i = 0; i < reference.fragmentsLength; i++) {
+      const part = reference.nextPart();
+      if (i !== 0) reader.receive(part);
+    }
+    for (let i = 0; i < 100 && !reader.isComplete; i++) reader.receive(reference.nextPart());
+    expect(reader.result).toEqual(payload);
+  });
+
   test('unwraps a complete uppercase single-part UR into exact payload bytes', () => {
     const payload = new TextEncoder().encode('cashuBexample');
     const encoder = new UREncoder(UR.fromBuffer(Buffer.from(payload)), 100);

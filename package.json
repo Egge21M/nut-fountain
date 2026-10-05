@@ -5,15 +5,16 @@
   "devDependencies": {
     "@types/bun": "latest",
     "buffer": "6.0.3",
-    "playwright": "1.63.0"
+    "playwright": "1.63.0",
+    "@gandlaf21/bc-ur": "1.1.12"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
     "@cashu/cashu-ts": "4.11.0",
-    "@gandlaf21/bc-ur": "1.1.12",
-    "cborg": "4.3.2"
+    "cborg": "4.3.2",
+    "@noble/hashes": "2.4.0"
   },
   "version": "0.0.0-experimental",
   "description": "Experimental browser-compatible binary fountain transport with Cashu and inbound UR helpers",
@@ -44,7 +45,8 @@
   "files": [
     "dist",
     "README.md",
-    "docs/protocol.md"
+    "docs/protocol.md",
+    "NOTICE.md"
   ],
   "scripts": {
     "build": "bun scripts/build.ts",
