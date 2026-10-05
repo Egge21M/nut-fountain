@@ -17,6 +17,8 @@ Tickets 01, 02 and 03 are independent. Ticket 04 depends on all three. Implement
 
 - Resolved [03 UR reader](issues/03-ur-reader.md): bounded inbound single/multipart UR adapter; merge `846413a`, six tests, typecheck and browser-target bundle passed.
 
+- Resolved [01 Byte core](issues/01-byte-core.md): versioned dependency-free binary transport and protocol document; merge `6314589`, combined 24 tests and typecheck passed.
+
 ## Fog
 
 No outstanding product questions. API and wire details will be documented during implementation. The final code review compares against main (the pre-implementation baseline).

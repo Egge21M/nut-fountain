@@ -1,7 +1,7 @@
 # 01: Versioned binary fountain core
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: None
 
 Spec: [Package purpose](../spec.md)
@@ -19,3 +19,7 @@ Use the tdd skill at the public round-trip seams already agreed in the spec. Wor
 - Created from the agreed purpose and goals; implementation details are delegated within this scope.
 
 - Claimed by the corresponding implementer on its isolated worktree.
+
+## Answer
+
+Implemented in `ce7633e`, integrated by merge `6314589`. Dependency-free byte fountain core supplies explicit version-1 framing, message/frame checksums, systematic and repair frames, bounded Gaussian decoding, and documented wire vectors. Integration validation: `bun test` passed all 24 tests and 125 assertions (including the ten core tests); `bunx tsc --noEmit` passed. Wire layout and algorithm are documented in `docs/protocol.md`.
