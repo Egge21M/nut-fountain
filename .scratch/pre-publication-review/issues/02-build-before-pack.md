@@ -1,6 +1,6 @@
 # 02: Ensure release tarballs contain current build artifacts
 
-Status: ready-for-agent
+Status: resolved
 Severity: P1 for publication
 Axis: Publication preflight
 Reviewed commit: cdb04b955907ab364cbb2505996c525185258402
@@ -17,3 +17,7 @@ Snapshot from git archive HEAD packages/nut-fountain in /tmp/nut-fountain-public
 ## Acceptance
 
 Add a release/pack lifecycle that builds or fails when artifacts are missing/stale. Test an actual tarball from a clean checkout and assert every exported JS/declaration path exists. Do not publish as part of this fix.
+
+## Resolution
+
+2026-10-05: Added prepack to rebuild JS/declarations. The clean-checkout test verifies 43 packed files including every export, installs only the tarball and production dependencies, and runs all six entry points in native Node and Chromium. The verified artifact contains no workspace-only files or development-only dependencies.
