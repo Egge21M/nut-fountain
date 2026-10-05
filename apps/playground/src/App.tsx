@@ -1,3 +1,6 @@
+import { TransferTiming, payloadKilobytesPerSecond } from './transferTiming';
+import { ScanReport } from './ScanReport';
+import type { FrameOutcome } from './scanDiagnostics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FountainDecoder, FountainEncoder } from 'nut-fountain/core';
 import { bytesToToken, bytesToTokenString, tokenToBytes } from 'nut-fountain/cashu';
@@ -8,8 +11,9 @@ import { AutoDecoder } from 'nut-fountain/auto';
 
 const demo = makeDemoToken();
 
-function TokenResult({ token, local = false }: { token: string; local?: boolean }) {
+function TokenResult({ token, local = false, durationMs, payloadBytes }: { token: string; local?: boolean; durationMs?: number; payloadBytes?: number }) {
   const [copyStatus, setCopyStatus] = useState('');
+  const throughput = payloadKilobytesPerSecond(payloadBytes, durationMs);
   const details = bytesToToken(tokenToBytes(token));
   const copy = async () => {
     try { await navigator.clipboard.writeText(token); setCopyStatus('Copied'); }
@@ -20,6 +24,8 @@ function TokenResult({ token, local = false }: { token: string; local?: boolean 
       <h3>{local ? 'Local QR round trip passed' : 'Token received'}</h3>
       <p>{details.proofs.length} proofs · {details.unit} · {details.mint}</p>
     </div></div>
+    {durationMs !== undefined && <p className="field-note" aria-label="Transfer duration">First valid frame to completion: <strong>{(durationMs / 1000).toFixed(3)} s</strong></p>}
+    {durationMs !== undefined && <p className="field-note" aria-label="Transfer throughput">Average payload rate: <strong>{throughput === undefined ? 'N/A' : `≈ ${throughput.toFixed(2)} kB/s`}</strong> <span>(1 kB = 1,000 bytes)</span></p>}
     <textarea aria-label="Decoded Cashu token" readOnly value={token} rows={3} spellCheck={false} />
     <div className="result-actions"><button className="button secondary small" onClick={copy}>Copy token</button>
       <span role="status">{copyStatus}</span></div>
@@ -35,6 +41,7 @@ function Sender({ token, setToken }: { token: string; setToken: (value: string) 
   const [fragmentSize, setFragmentSize] = useState(128);
   const [fps, setFps] = useState(5);
   const [sequence, setSequence] = useState(0);
+  const [qrInfo, setQrInfo] = useState<{ version: number; modules: number }>();
   const [info, setInfo] = useState({ bytes: 0, count: 0 });
   const [error, setError] = useState('');
   const [decoded, setDecoded] = useState('');
@@ -42,13 +49,14 @@ function Sender({ token, setToken }: { token: string; setToken: (value: string) 
 
   useEffect(() => {
     setPlaying(false); encoder.current = null; localReader.current = null;
-    setSequence(0); setInfo({ bytes: 0, count: 0 }); setDecoded(''); setError(''); setChecking(false);
+    setSequence(0); setQrInfo(undefined); setInfo({ bytes: 0, count: 0 }); setDecoded(''); setError(''); setChecking(false);
   }, [token, fragmentSize]);
 
   const next = useCallback(() => {
     if (!encoder.current || !canvas.current) return;
     try {
-      drawFrame(canvas.current, encoder.current.nextFrame());
+      const qr = drawFrame(canvas.current, encoder.current.nextFrame());
+      setQrInfo(previous => previous?.version === qr.version ? previous : qr);
       setSequence(value => value + 1);
       if (localReader.current) {
         const scanned = readCanvas(canvas.current);
@@ -110,11 +118,14 @@ function Sender({ token, setToken }: { token: string; setToken: (value: string) 
           <div><label htmlFor="fragment">Bytes per fragment</label><select id="fragment" disabled={playing} value={fragmentSize}
             onChange={event => setFragmentSize(Number(event.target.value))}>
             <option value={80}>80 · easier to scan</option><option value={128}>128 · balanced</option><option value={180}>180 · denser QR</option>
+            {[256, 384, 512, 768, 1024, 1536, 2048].map(size => <option key={size} value={size}>{size} · density test</option>)}
+            <option value={2307}>2307 · QR maximum</option>
           </select></div>
           <div><label htmlFor="fps">Frame rate <strong>{fps} fps</strong></label>
-            <input id="fps" type="range" min="2" max="12" value={fps} onChange={event => setFps(Number(event.target.value))} />
+            <input id="fps" type="range" min="2" max="60" value={fps} onChange={event => setFps(Number(event.target.value))} />
             <div className="range-labels"><span>Slower</span><span>Faster</span></div></div>
         </div>
+        <p className="field-note">Larger fragments put more data in each QR. Fragments larger than the token are padded, so you can still test the full density.</p>
         <div className="actions"><button className="button secondary" disabled={playing} onClick={() => encoder.current ? next() : prepare(false, false)}>Next frame →</button></div>
         <button className="local-test" disabled={playing} onClick={() => prepare(true)}>↻ Run local QR test <span>No second device needed</span></button>
         {error && <p className="message error" role="alert">{error}</p>}
@@ -126,6 +137,7 @@ function Sender({ token, setToken }: { token: string; setToken: (value: string) 
           <canvas ref={canvas} hidden={!sequence} aria-label="Binary fountain QR code" role="img" />
           {!sequence && <div className="qr-placeholder"><div className="qr-mark">▦</div><h3>Your transfer starts here</h3><p>Start sending to display<br />animated QR frames.</p></div>}
         </div>
+        {qrInfo && <p className="field-note" aria-label="QR density">QR v{qrInfo.version} · {qrInfo.modules} × {qrInfo.modules} modules · error correction M</p>}
         <p className="scan-hint">Open <strong>Receive</strong> on your other device<br />and point its camera at this code.</p>
         <button className="button primary playback" onClick={toggle}>
           {playing ? 'Ⅱ Pause' : sequence ? '▶ Resume sending' : '▶ Start sending'}</button>
@@ -141,6 +153,8 @@ function Sender({ token, setToken }: { token: string; setToken: (value: string) 
 
 function Receiver() {
   const reader = useRef(new AutoDecoder());
+  const timing = useRef(new TransferTiming());
+  const [transferDurationMs, setTransferDurationMs] = useState<number>();
   const importSession = useRef(0);
   const [reads, setReads] = useState(0);
   const [progress, setProgress] = useState({ value: 0, useful: 0, total: undefined as number | undefined });
@@ -148,30 +162,41 @@ function Receiver() {
   const [issue, setIssue] = useState('');
   const [loading, setLoading] = useState(false);
   useEffect(() => () => { importSession.current++; }, []);
-  const accept = (bytes: Uint8Array): boolean => {
-    if (reader.current.isComplete) return true;
+  const accept = (bytes: Uint8Array): FrameOutcome => {
+    const receivedAt = performance.now();
+    const before = reader.current.independentFrames;
+    let accepted = false;
+    let decoderError = false;
+    let tokenValid: boolean | undefined;
     setReads(value => value + 1);
     try {
-      reader.current.receive(bytes);
+      accepted = reader.current.receive(bytes);
       setIssue('');
-      if (reader.current.isComplete) { setDecoded(bytesToTokenString(reader.current.result!)); return true; }
-    } catch (failure) {
       if (reader.current.isComplete) {
-        setIssue('The transfer completed, but its bytes are not a supported Cashu token. Reset to try again.');
-        return true;
+        setDecoded(bytesToTokenString(reader.current.result!)); tokenValid = true;
       }
-      if (failure instanceof Error && failure.message.includes('another message')) {
+    } catch (failure) {
+      decoderError = true;
+      if (reader.current.isComplete) {
+        tokenValid = false;
+        setIssue('The transfer completed, but its bytes are not a supported Cashu token. Reset to try again.');
+      } else if (failure instanceof Error && failure.message.includes('another message')) {
         setIssue('This is a different transfer. Reset the reader to receive it.');
       }
-    } finally {
-      setProgress({ value: reader.current.progress, useful: reader.current.independentFrames, total: reader.current.fragmentCount });
     }
-    return false;
+    // A failed UR reconstruction clears its internal transfer; its timer must reset too.
+    if (reader.current.fragmentCount === undefined) timing.current.reset();
+    else timing.current.record(receivedAt, performance.now(), accepted, reader.current.isComplete);
+    setTransferDurationMs(timing.current.durationMs);
+    setProgress({ value: reader.current.progress, useful: reader.current.independentFrames, total: reader.current.fragmentCount });
+    return { complete: reader.current.isComplete, useful: Math.max(0, reader.current.independentFrames - before),
+      rank: reader.current.independentFrames, fragmentCount: reader.current.fragmentCount,
+      format: reader.current.format, decoderError, tokenValid, firstValidFrameToCompleteMs: timing.current.durationMs, payloadBytes: reader.current.result?.byteLength };
   };
   const camera = useCamera(accept);
   const reset = () => {
-    camera.stop(); importSession.current++; setLoading(false);
-    reader.current.reset(); setReads(0); setProgress({ value: 0, useful: 0, total: undefined }); setDecoded(''); setIssue('');
+    camera.stop(); camera.clearReport(); importSession.current++; setLoading(false);
+    reader.current.reset(); timing.current.reset(); setTransferDurationMs(undefined); setReads(0); setProgress({ value: 0, useful: 0, total: undefined }); setDecoded(''); setIssue('');
   };
   const importImages = async (files: File[]) => {
     camera.stop(); const session = ++importSession.current;
@@ -181,7 +206,7 @@ function Receiver() {
       for (const file of files) {
         const bytes = await readQrImage(file);
         if (session !== importSession.current) return;
-        if (bytes) { found = true; if (accept(bytes)) break; }
+        if (bytes) { found = true; if (accept(bytes).complete) break; }
       }
       if (!found) setIssue('No QR code was found in these images. Use clear screenshots of the sender’s QR code.');
     } catch {
@@ -207,8 +232,21 @@ function Receiver() {
           <p className="field-note">{progress.total === undefined ? 'Waiting for the first valid frame.'
             : `${progress.useful} of ${progress.total} independent frames collected.`} Progress measures information collected, not time remaining.</p>
         </div>
+        <div className="camera-choice">
+          <label htmlFor="camera-choice">Camera</label>
+          <select id="camera-choice" value={camera.selectedCamera} disabled={camera.phase === 'requesting' || loading}
+            onChange={event => camera.selectCamera(event.target.value)}>
+            <option value="">Automatic rear camera</option>
+            {camera.selectedCamera && !camera.cameras.some(device => device.deviceId === camera.selectedCamera) &&
+              <option value={camera.selectedCamera}>Previously selected camera (unavailable)</option>}
+            {camera.cameras.map(device => <option key={device.deviceId} value={device.deviceId}>{device.label}</option>)}
+          </select>
+          <p className="field-note">{camera.cameras.length
+            ? 'Choose an individual camera to avoid lens switching. Combined Dual or Triple cameras may still switch lenses. Changing cameras keeps your decoding progress.'
+            : 'Start the camera to list the lenses your browser exposes.'}</p>
+        </div>
         <div className="camera-actions"><button className="button primary" disabled={Boolean(decoded) || loading}
-          onClick={running ? camera.stop : camera.start}>{camera.phase === 'requesting' ? 'Cancel camera request' : running ? 'Stop camera' : 'Start camera'}</button>
+          onClick={() => running ? camera.stop() : void camera.start()}>{camera.phase === 'requesting' ? 'Cancel camera request' : running ? 'Stop camera' : 'Start camera'}</button>
           <button className="button secondary" onClick={reset}>Reset reader</button></div>
       </section>
       <section className="panel receive-info">
@@ -226,7 +264,8 @@ function Receiver() {
         <div className="receive-status" role="status">{decoded ? '✓ Token reconstructed' : loading ? 'Reading frames…' : progress.useful ? 'Collecting frames… keep scanning.' : 'Waiting for your first frame.'}</div>
       </section>
     </div>
-    {decoded && <TokenResult token={decoded} />}
+    {decoded && <TokenResult token={decoded} durationMs={transferDurationMs} payloadBytes={reader.current.result?.byteLength} />}
+    {camera.report && <ScanReport key={camera.report.startedAt} report={camera.report} />}
     <div className="tip"><span>↳</span><p>The reader automatically recognizes nut-fountain binary frames and ur:bytes containing cashuB text or a binary Cashu V4 token. Sending from this demo uses the new binary format.</p></div>
   </>;
 }

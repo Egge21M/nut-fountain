@@ -1,3 +1,4 @@
+import { checkCameraSelection } from './camera-selection';
 import { strict as assert } from 'node:assert';
 import { resolve, sep } from 'node:path';
 import { chromium, type Page } from 'playwright';
@@ -87,6 +88,8 @@ try {
     await page.getByRole('heading', { name: 'Token received' }).waitFor();
     assert.equal(await page.getByLabel('Decoded Cashu token').inputValue(), token);
     assert.equal(await value(), 1);
+    await page.getByLabel('Transfer duration').waitFor();
+    await page.getByLabel('Transfer throughput').waitFor();
     passed.push(`${multipart ? 'Multipart' : 'Single-part'} UR ${binary ? 'binary token' : 'cashuB string'} images auto-detect and decode`);
   }
   const urFrames = await qrImages(urParts(new TextEncoder().encode(token), 100, true).map(part => part.toUpperCase()));
@@ -94,8 +97,24 @@ try {
   const camera = await browser.newPage();
   camera.on('pageerror', error => failures.push(error.message));
   await camera.addInitScript(({ frames }) => {
-    const state = { stops: 0, delay: 0, deny: false, blank: false, frames };
+    const state = { stops: 0, workers: 0, delay: 0, deny: false, blank: false, failWorker: false, freezeMediaTime: true, initialBlankMs: 1000, drawMs: 180, captureFps: 30, frames };
     Object.assign(window, { cameraTest: state });
+    // Live iPhone camera metadata can keep mediaTime unchanged even though
+    // presentedFrames advances. A blank first image must not freeze the reader.
+    const requestFrame = HTMLVideoElement.prototype.requestVideoFrameCallback;
+    HTMLVideoElement.prototype.requestVideoFrameCallback = function(callback) {
+      return requestFrame.call(this, (now, metadata) => callback(now,
+        state.freezeMediaTime ? { ...metadata, mediaTime: 0 } : metadata));
+    };
+    const NativeWorker = window.Worker;
+    window.Worker = class extends NativeWorker {
+      private ended = false;
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options); state.workers++;
+        if (state.failWorker) setTimeout(() => this.dispatchEvent(new ErrorEvent('error', { cancelable: true })), 10);
+      }
+      terminate() { if (!this.ended) { this.ended = true; state.workers--; } super.terminate(); }
+    };
     Object.defineProperty(navigator.mediaDevices, 'getUserMedia', { value: async () => {
       if (state.deny) throw new DOMException('Denied', 'NotAllowedError');
       const images = await Promise.all(state.frames.map(async src => {
@@ -105,13 +124,14 @@ try {
       canvas.width = Math.max(...images.map(image => image.width)); canvas.height = Math.max(...images.map(image => image.height));
       const context = canvas.getContext('2d')!;
       let index = 0;
+      const started = performance.now();
       const draw = () => {
         context.fillStyle = 'white'; context.fillRect(0, 0, canvas.width, canvas.height);
-        if (!state.blank) context.drawImage(images[index++ % images.length]!, 0, 0);
+        if (!state.blank && performance.now() - started >= state.initialBlankMs) context.drawImage(images[index++ % images.length]!, 0, 0);
       };
       draw();
-      const interval = setInterval(draw, 180);
-      const stream = canvas.captureStream(15);
+      const interval = setInterval(draw, state.drawMs);
+      const stream = canvas.captureStream(state.captureFps);
       for (const track of stream.getTracks()) {
         const stop = track.stop.bind(track);
         track.stop = () => { state.stops++; clearInterval(interval); stop(); };
@@ -125,13 +145,53 @@ try {
   await camera.getByRole('heading', { name: 'Token received' }).waitFor({ timeout: 25000 });
   assert.equal(await camera.getByLabel('Decoded Cashu token').inputValue(), token);
   await camera.waitForFunction(() => (window as any).cameraTest.stops === 1);
-  passed.push('Camera video → QR pixels → token; track stops on completion');
+  await camera.waitForFunction(() => (window as any).cameraTest.workers === 0);
+  const downloadReport = async () => {
+    const [download] = await Promise.all([
+      camera.waitForEvent('download'), camera.getByRole('button', { name: 'Download scan diagnostics' }).click(),
+    ]);
+    return JSON.parse(await Bun.file((await download.path())!).text());
+  };
+  await camera.getByLabel('Sender frame rate (optional)').fill('8');
+  const diagnostics = await downloadReport();
+  assert.equal(diagnostics.reason, 'complete');
+  assert.equal(diagnostics.configuration.decoder, 'jsQR-worker');
+  assert.equal(diagnostics.environment.scheduler, 'video-frame-callback');
+  assert.equal(diagnostics.transfer.format, 'binary');
+  assert.equal(diagnostics.transfer.tokenValid, true);
+  assert.ok(diagnostics.firstValidFrameToCompleteMs > 0);
+  assert.ok(diagnostics.payloadBytes > 0);
+  assert.equal(diagnostics.payloadKilobytesPerSecond, diagnostics.payloadBytes / diagnostics.firstValidFrameToCompleteMs);
+  assert.ok((await camera.getByLabel('Transfer throughput').textContent())?.includes(diagnostics.payloadKilobytesPerSecond.toFixed(2)));
+  assert.ok(diagnostics.firstValidFrameToCompleteMs < diagnostics.activeDurationMs);
+  assert.ok((await camera.getByLabel('Transfer duration').textContent())?.includes((diagnostics.firstValidFrameToCompleteMs / 1000).toFixed(3)));
+  assert.equal(diagnostics.counts.usefulEquations, count);
+  assert.equal(diagnostics.testConditions.senderFps, 8);
+  assert.ok(diagnostics.rates.attemptsPerSecond > 0);
+  assert.ok(diagnostics.timings.qrDecodeMs.count > 0);
+  assert.ok(!JSON.stringify(diagnostics).includes(token));
+  assert.ok(!JSON.stringify(diagnostics).includes('mint.example'));
+  await Bun.write('/tmp/nut-fountain-camera-diagnostics.json', JSON.stringify(diagnostics, null, 2));
+  passed.push('Moving video with constant mediaTime advances from a blank first frame, completes in the worker, and exports diagnostics');
 
   await camera.getByRole('button', { name: 'Reset reader' }).click();
-  await camera.evaluate(() => { (window as any).cameraTest.blank = true; });
+  assert.equal(await camera.getByRole('button', { name: 'Download scan diagnostics' }).count(), 0);
+  await camera.evaluate(() => Object.assign((window as any).cameraTest, { blank: true, freezeMediaTime: false, initialBlankMs: 0, drawMs: 16, captureFps: 30 }));
   await camera.getByRole('button', { name: 'Start camera', exact: true }).click();
+  await camera.getByRole('button', { name: 'Stop camera', exact: true }).waitFor();
+  await camera.waitForTimeout(1500);
   await camera.getByRole('button', { name: 'Stop camera', exact: true }).click();
-  await camera.waitForFunction(() => (window as any).cameraTest.stops === 2);
+  await camera.waitForFunction(() => (window as any).cameraTest.stops === 2 && (window as any).cameraTest.workers === 0);
+  const blankReport = await downloadReport();
+  assert.equal(blankReport.reason, 'stopped');
+  assert.equal(blankReport.firstValidFrameToCompleteMs, undefined);
+  assert.equal(blankReport.payloadKilobytesPerSecond, undefined);
+  assert.equal(await camera.getByLabel('Transfer duration').count(), 0);
+  assert.ok(blankReport.counts.completedAttempts > 0);
+  assert.equal(blankReport.counts.qrReads, 0);
+  console.log(JSON.stringify({ simulatedCameraScansPerSecond: blankReport.rates.attemptsPerSecond }));
+  await camera.waitForTimeout(200);
+  assert.deepEqual(await downloadReport(), blankReport);
   await camera.getByRole('button', { name: 'Start camera', exact: true }).click();
   await camera.getByRole('button', { name: 'Stop camera', exact: true }).waitFor();
   await camera.getByRole('button', { name: '↗ Send', exact: true }).click();
@@ -153,16 +213,39 @@ try {
   passed.push('Permission denial displays an actionable message');
 
   await camera.getByRole('button', { name: 'Reset reader' }).click();
-  await camera.evaluate(frames => Object.assign((window as any).cameraTest, { frames, deny: false, blank: false, delay: 0 }), urFrames);
+  await camera.evaluate(frames => {
+    Object.assign((window as any).cameraTest, { frames, deny: false, blank: false, delay: 0, drawMs: 180 });
+    Object.defineProperty(HTMLVideoElement.prototype, 'requestVideoFrameCallback', { value: undefined, configurable: true });
+  }, urFrames);
   await camera.getByRole('button', { name: 'Start camera', exact: true }).click();
   await camera.getByRole('heading', { name: 'Token received' }).waitFor({ timeout: 30000 });
   assert.equal(await camera.getByLabel('Decoded Cashu token').inputValue(), token);
   await camera.waitForFunction(() => (window as any).cameraTest.stops === 5);
   assert.equal(await camera.getByRole('progressbar').evaluate(element => (element as HTMLProgressElement).value), 1);
-  passed.push('Camera automatically decodes uppercase UR cashuB text from repair frames with loss, then stops');
+  const urReport = await downloadReport();
+  assert.equal(urReport.environment.scheduler, 'animation-frame');
+  assert.equal(urReport.transfer.format, 'ur');
+  assert.equal(urReport.transfer.tokenValid, true);
+  assert.ok(urReport.firstValidFrameToCompleteMs > 0);
+  assert.ok(urReport.payloadBytes > 0);
+  assert.equal(urReport.payloadKilobytesPerSecond, urReport.payloadBytes / urReport.firstValidFrameToCompleteMs);
+  assert.ok((await camera.getByLabel('Transfer throughput').textContent())?.includes(urReport.payloadKilobytesPerSecond.toFixed(2)));
+  assert.ok((await camera.getByLabel('Transfer duration').textContent())?.includes((urReport.firstValidFrameToCompleteMs / 1000).toFixed(3)));
+  assert.ok(!JSON.stringify(urReport).includes(token));
+  await camera.waitForFunction(() => (window as any).cameraTest.workers === 0);
+  passed.push('Animation-frame fallback decodes UR repair frames and exports UR progress diagnostics');
+
+  await camera.getByRole('button', { name: 'Reset reader' }).click();
+  await camera.evaluate(() => { (window as any).cameraTest.failWorker = true; });
+  await camera.getByRole('button', { name: 'Start camera', exact: true }).click();
+  await camera.getByRole('alert').filter({ hasText: 'Could not read the camera image' }).waitFor();
+  await camera.waitForFunction(() => (window as any).cameraTest.stops === 6 && (window as any).cameraTest.workers === 0);
+  assert.equal((await downloadReport()).reason, 'error');
+  passed.push('Worker errors stop capture, release resources, and leave an exportable diagnostic report');
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await mobile.goto(server.url.href);
+  assert.equal(await mobile.locator('#fps').getAttribute('max'), '60');
   await mobile.getByRole('button', { name: /Start sending/ }).click();
   await mobile.getByRole('button', { name: /Pause/ }).click();
   assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
@@ -170,6 +253,7 @@ try {
   await mobile.getByRole('button', { name: '↙ Receive', exact: true }).click();
   assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   passed.push('390px mobile send and receive views have no horizontal overflow');
+  passed.push(await checkCameraSelection(browser, server.url.href));
   assert.deepEqual(failures, []);
   console.log(JSON.stringify({ passed }, null, 2));
 } finally {

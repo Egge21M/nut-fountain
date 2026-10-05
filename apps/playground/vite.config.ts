@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 
 export default defineConfig({
+  define: { 'import.meta.env.VITE_BUILD_TIME': JSON.stringify(new Date().toISOString()) },
   plugins: [react(), ...(process.env.PLAYGROUND_HTTPS === '1' ? [basicSsl()] : [])],
   server: {
     port: 5173, strictPort: true,

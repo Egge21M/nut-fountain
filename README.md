@@ -35,6 +35,22 @@ You can also use **Next frame** on the sender and import screenshots with **Impo
 
 Tokens are processed locally, without uploads, storage, or mint calls. The app reads the scanner's binary data directly; it does not encode fountain frames as base64, UTF-8 text, or UR. The device reader also automatically accepts single-part and animated `ur:bytes` QR codes carrying UTF-8 `cashuB` strings or `crawB` binary tokens. Camera scanning and image import use the package’s public `AutoDecoder`, with progress for both formats. Applications can instead select the scoped `FountainDecoder` or `UrDecoder`. Reset the reader before switching transfers. Sending still uses only the new binary format.
 
+## Measure phone scanning speed
+
+The sender allows 2–60 FPS and starts at 5 FPS. Fragment sizes range from 80 to 2,307 bytes, with extra density test steps at 256, 384, 512, 768, 1,024, 1,536, and 2,048 bytes. The maximum fills a version-40 QR at error correction M (2,307 payload bytes plus the 24-byte frame header). The displayed QR version and module dimensions identify its density. Fragments retain the selected size even for smaller tokens, using padding; beyond the token size, higher density adds padding rather than useful data. The camera reader processes fresh video frames without a fixed polling delay. It uses a QR worker with one frame in flight, skips busy frames instead of queuing them, and falls back to animation-frame scheduling when video-frame callbacks are unavailable. It requests a camera rate of 60 FPS as a preference; the camera/browser chooses the actual rate. Capture is limited to a 720-pixel longest side.
+
+After a camera transfer completes, choose **Download scan diagnostics**. You can also stop an incomplete scan and download its report. Enter the sender's FPS in the optional field so comparisons include the display rate. Resetting the reader clears the report; starting another camera session replaces it.
+
+After starting the reader camera, the **Camera** picker lists the devices exposed by your browser. Selecting one requests its exact device ID; changing it restarts capture while preserving the reader's progress. The choice remains across reader resets for this view, and is not saved to storage. Select an individual rear camera to avoid multi-lens switching; a combined Dual/Triple camera can still switch internally. Browsers do not expose a universal native iOS lens-switch lock, and may not expose every physical lens. An unavailable selected camera produces an error instead of silently choosing a different one. Diagnostic reports include only `camera.selection` (`automatic` or `explicit-device`), never the device IDs or labels.
+
+For useful comparisons, use the same token, fragment size, screen brightness, distance, and lighting. Reset between runs and try 5, 10, 15, 20, 30, 40, 50, and 60 FPS. Share the downloaded JSON files along with the phone model if its browser user agent does not identify it precisely.
+
+The result also shows **First valid frame to completion**, and JSON reports expose `firstValidFrameToCompleteMs`. This is reader wall time from receipt of the first accepted fountain frame through completed validation, excluding the earlier time spent aiming. It includes any pauses or image imports within that reader transfer and resets with the reader. Incomplete scans omit the duration. The result also shows approximate average payload throughput in decimal **kB/s** (1 kB = 1,000 bytes), calculated from reconstructed payload bytes over that same duration, excluding fountain/QR overhead and duplicates. Reports expose `payloadBytes` and `payloadKilobytesPerSecond`; a zero-duration transfer has no rate. For UR text transfers the payload size includes the reconstructed token text.
+
+Reports contain build/browser information, actual camera settings, capture dimensions, active duration, camera callbacks and skipped frames, scan/QR/useful-equation rates, timing summaries, and a bounded timeline. They contain no tokens, raw QR payloads, camera images, mint URLs, or camera identifiers. Reports are generated locally and downloaded only when requested. Image imports do not produce camera reports.
+
+Rates include time spent aiming after the camera starts, so compare time to the first useful frame as well as the overall rate. Useful equations measure fountain rank increases; QR reads can be duplicates or otherwise add no information. Camera presentation gaps are not a measurement of lost sender QR frames. Worker round-trip time includes startup on the first attempt; percentile summaries cover the latest 2048 attempts, while means/maxima cover the whole session.
+
 ## Validate and build
 
 ```sh
@@ -48,7 +64,7 @@ Browser tests require Chromium installed for Playwright (`bunx playwright instal
 
 Production assets are in `apps/playground/dist`; library artifacts are in `packages/nut-fountain/dist`. Use `bun run preview` after building to preview the app on port 4173. Camera access on a remote preview still requires trusted HTTPS.
 
-See the [library README](packages/nut-fountain/README.md) for APIs and [wire protocol](packages/nut-fountain/docs/protocol.md) for the experimental format.
+See the [protocol specification](packages/nut-fountain/docs/protocol.md) for language-neutral wire rules, the [implementation guide](packages/nut-fountain/docs/implementation.md) for the solver and package behavior, and the [library README](packages/nut-fountain/README.md) for API examples.
 
 ## Fly.io deployment
 

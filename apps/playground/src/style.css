@@ -115,3 +115,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .decoding-progress progress::-webkit-progress-bar { background: #e5eade; border-radius: 6px; }
 .decoding-progress progress::-webkit-progress-value { background: #527b35; border-radius: 6px; }
 .decoding-progress progress::-moz-progress-bar { background: #527b35; border-radius: 6px; }
+
+.scan-report { margin-top: 20px; }
+.scan-report label { display: block; max-width: 320px; margin: 16px 0; }
+.scan-report input { display: block; width: 100%; margin-top: 8px; padding: 10px; border: 1px solid #dfe5d7; border-radius: 8px; }

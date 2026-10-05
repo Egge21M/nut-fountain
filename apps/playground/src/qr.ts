@@ -1,11 +1,12 @@
 import QRCode from 'qrcode';
-import jsQR from 'jsqr';
+import { readQrPixels } from './qrDecode';
+export { readQrPixels } from './qrDecode';
 
 export function createFrameQr(frame: Uint8Array) {
   return QRCode.create([{ mode: 'byte', data: frame }], { errorCorrectionLevel: 'M' });
 }
 
-export function drawFrame(canvas: HTMLCanvasElement, frame: Uint8Array): void {
+export function drawFrame(canvas: HTMLCanvasElement, frame: Uint8Array): { version: number; modules: number } {
   const qr = createFrameQr(frame);
   const scale = 6, quiet = 4;
   canvas.width = canvas.height = (qr.modules.size + quiet * 2) * scale;
@@ -16,13 +17,9 @@ export function drawFrame(canvas: HTMLCanvasElement, frame: Uint8Array): void {
   for (let y = 0; y < qr.modules.size; y++) for (let x = 0; x < qr.modules.size; x++) {
     if (qr.modules.get(y, x)) context.fillRect((x + quiet) * scale, (y + quiet) * scale, scale, scale);
   }
+  return { version: qr.version, modules: qr.modules.size };
 }
 
-/** jsQR.binaryData retains arbitrary bytes; its text field would corrupt them. */
-export function readQrPixels(pixels: Uint8ClampedArray, width: number, height: number): Uint8Array | undefined {
-  const code = jsQR(pixels, width, height, { inversionAttempts: 'dontInvert' });
-  return code ? new Uint8Array(code.binaryData) : undefined;
-}
 
 export function readCanvas(canvas: HTMLCanvasElement): Uint8Array | undefined {
   const pixels = canvas.getContext('2d', { willReadFrequently: true })!
