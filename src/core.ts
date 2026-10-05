@@ -1,6 +1,6 @@
 import { coefficients, xor, type Equation } from "./internal/core/equations.ts";
 import {
-  crc32, parseFrame, OVERHEAD, MAX_FRAGMENT_SIZE, MAX_FRAGMENTS, MAX_MESSAGE_LENGTH,
+  crc32, parseFrame, serializeFrame, MAX_FRAGMENT_SIZE, MAX_FRAGMENTS, MAX_MESSAGE_LENGTH,
   type Metadata,
 } from "./internal/core/wire.ts";
 
@@ -22,30 +22,24 @@ export class FountainEncoder {
     if (message.length > MAX_MESSAGE_LENGTH || this.fragmentCount > MAX_FRAGMENTS) {
       throw new RangeError(`Message requires more than ${MAX_FRAGMENTS} fragments; use a larger fragmentSize or smaller message`);
     }
-    this.message = message.slice();
+    this.message = new Uint8Array(message);
     this.checksum = crc32(this.message);
   }
 
   nextFrame(): Uint8Array {
     if (this.sequence === 0xffffffff) throw new RangeError("Fountain sequence exhausted; create a new encoder");
     const sequence = ++this.sequence;
-    const frame = new Uint8Array(OVERHEAD + this.fragmentSize);
-    frame.set([0x4e, 0x46, 1, 0]);
-    const view = new DataView(frame.buffer);
-    view.setUint32(4, sequence);
-    view.setUint32(8, this.fragmentCount);
-    view.setUint32(12, this.message.length);
-    view.setUint32(16, this.checksum);
     const selected = coefficients(sequence, this.fragmentCount);
-    const data = frame.subarray(20, -4);
+    const data = new Uint8Array(this.fragmentSize);
     for (let i = 0; i < selected.length; i++) {
       if (!selected[i]) continue;
       const start = i * this.fragmentSize;
       const fragment = this.message.subarray(start, start + this.fragmentSize);
       for (let j = 0; j < fragment.length; j++) data[j] = data[j]! ^ fragment[j]!;
     }
-    view.setUint32(frame.length - 4, crc32(frame.subarray(0, -4)));
-    return frame;
+    return serializeFrame({
+      sequence, count: this.fragmentCount, length: this.message.length, checksum: this.checksum, data,
+    });
   }
 }
 

@@ -1,5 +1,39 @@
 import { expect, test } from "bun:test";
+import { Buffer } from "buffer";
 import { FountainDecoder, FountainEncoder } from "../src/core.ts";
+
+test("changing a Buffer input after encoder construction preserves the original message", () => {
+  const input = Buffer.from([1, 2, 3]);
+  const encoder = new FountainEncoder(input, { fragmentSize: 3 });
+  input.fill(0);
+  const decoder = new FountainDecoder();
+  decoder.receive(encoder.nextFrame());
+  expect(decoder.result).toEqual(Uint8Array.of(1, 2, 3));
+});
+
+test("changing a received Buffer frame cannot alter the reader's stored message", () => {
+  const encoder = new FountainEncoder(Uint8Array.of(1, 2, 3, 4), { fragmentSize: 2 });
+  const firstFrame = Buffer.from(encoder.nextFrame());
+  const decoder = new FountainDecoder();
+  decoder.receive(firstFrame);
+  firstFrame.fill(0);
+  decoder.receive(Buffer.from(encoder.nextFrame()));
+  expect(decoder.result).toEqual(Uint8Array.of(1, 2, 3, 4));
+});
+
+test("receiving dependent Buffer frames leaves the caller's bytes unchanged", () => {
+  const encoder = new FountainEncoder(Uint8Array.of(1, 2, 3, 4), { fragmentSize: 2 });
+  const firstFrame = Buffer.from(encoder.nextFrame());
+  const duplicate = Buffer.from(firstFrame);
+  const originalFrame = new Uint8Array(firstFrame);
+  const decoder = new FountainDecoder();
+  decoder.receive(firstFrame);
+  expect(decoder.receive(duplicate)).toBe(false);
+  expect(duplicate).toEqual(Buffer.from(originalFrame));
+  expect(firstFrame).toEqual(Buffer.from(originalFrame));
+  decoder.receive(encoder.nextFrame());
+  expect(decoder.result).toEqual(Uint8Array.of(1, 2, 3, 4));
+});
 
 test("arbitrary bytes round-trip through fountain frames", () => {
   const message = Uint8Array.from([0, 255, 1, 128, 7, 0, 12]);
