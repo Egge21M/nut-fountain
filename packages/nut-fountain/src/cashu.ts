@@ -1,5 +1,5 @@
 import { getDecodedTokenBinary, getEncodedTokenBinary, type Token } from '@cashu/cashu-ts';
-import { decodeBase64Url, encodeBase64Url, decodeCbor } from './encoding';
+import { decodeBase64Url, encodeBase64Url, decodeCbor } from './encoding.js';
 
 export type { Token } from '@cashu/cashu-ts';
 

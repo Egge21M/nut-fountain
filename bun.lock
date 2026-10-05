@@ -34,7 +34,7 @@
     },
     "packages/nut-fountain": {
       "name": "nut-fountain",
-      "version": "0.0.0-experimental",
+      "version": "0.1.0-alpha.0",
       "dependencies": {
         "@cashu/cashu-ts": "4.11.0",
         "@noble/hashes": "2.4.0",
@@ -42,12 +42,10 @@
       },
       "devDependencies": {
         "@gandlaf21/bc-ur": "1.1.12",
-        "@types/bun": "latest",
+        "@types/bun": "1.4.2",
         "buffer": "6.0.3",
         "playwright": "1.63.0",
-      },
-      "peerDependencies": {
-        "typescript": "^5",
+        "typescript": "5.9.3",
       },
     },
   },

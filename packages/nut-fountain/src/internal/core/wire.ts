@@ -1,4 +1,4 @@
-import { crc32 } from '../crc32.ts';
+import { crc32 } from '../crc32.js';
 
 export const MAX_FRAGMENT_SIZE = 4096;
 export const MAX_FRAGMENTS = 256;

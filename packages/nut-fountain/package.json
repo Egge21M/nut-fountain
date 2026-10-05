@@ -1,22 +1,19 @@
 {
   "name": "nut-fountain",
   "type": "module",
-  "private": true,
   "devDependencies": {
-    "@types/bun": "latest",
+    "@types/bun": "1.4.2",
     "buffer": "6.0.3",
     "playwright": "1.63.0",
-    "@gandlaf21/bc-ur": "1.1.12"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
+    "@gandlaf21/bc-ur": "1.1.12",
+    "typescript": "5.9.3"
   },
   "dependencies": {
     "@cashu/cashu-ts": "4.11.0",
     "cborg": "4.3.2",
     "@noble/hashes": "2.4.0"
   },
-  "version": "0.0.0-experimental",
+  "version": "0.1.0-alpha.0",
   "description": "Experimental browser-compatible binary fountain transport with Cashu and inbound UR helpers",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -51,12 +48,42 @@
     "README.md",
     "docs/protocol.md",
     "docs/implementation.md",
-    "NOTICE.md"
+    "NOTICE.md",
+    "LICENSE",
+    "docs/validation.md"
   ],
   "scripts": {
     "build": "bun scripts/build.ts",
     "test": "bun run build && bun test tests",
     "typecheck": "bun x tsc --noEmit",
-    "test:browser": "bun run build && bun scripts/browser.ts"
+    "test:browser": "bun run build && bun scripts/browser.ts",
+    "prepack": "bun run build",
+    "test:package": "bun scripts/package.ts"
+  },
+  "license": "MIT",
+  "author": "Egge21M",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Egge21M/nut-fountain.git",
+    "directory": "packages/nut-fountain"
+  },
+  "homepage": "https://github.com/Egge21M/nut-fountain#readme",
+  "bugs": {
+    "url": "https://github.com/Egge21M/nut-fountain/issues"
+  },
+  "keywords": [
+    "cashu",
+    "fountain",
+    "cbor",
+    "ur",
+    "typescript"
+  ],
+  "engines": {
+    "node": ">=22.4.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha",
+    "registry": "https://registry.npmjs.org/"
   }
 }

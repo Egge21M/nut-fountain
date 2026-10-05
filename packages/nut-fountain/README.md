@@ -1,14 +1,23 @@
 # nut-fountain
 
-An experimental, browser-compatible TypeScript package for developing a binary fountain transport specification. It encodes arbitrary bytes into versioned binary fountain frames, reconstructs those bytes, and provides Cashu V4 helpers and an inbound UR reader. The package is private and has not been published; wire compatibility may change.
+An experimental, browser-compatible TypeScript package for developing a binary fountain transport specification. It encodes arbitrary bytes into versioned binary fountain frames, reconstructs those bytes, and provides Cashu V4 helpers and an inbound UR reader. This is an alpha release; APIs and wire compatibility may change.
 
-QR rendering and camera scanning live in the separate [device playground](../../apps/playground), outside this library. Wallet integration and comparative performance claims are outside this implementation. Its new dense GF(2) fountain protocol differs from the earlier POC; that POC's efficiency measurements do not establish this protocol's performance.
+QR rendering and camera scanning live in the separate [device playground](https://github.com/Egge21M/nut-fountain/tree/main/apps/playground), outside this library. Wallet integration and comparative performance claims are outside this implementation. Its new dense GF(2) fountain protocol differs from the earlier POC; that POC's efficiency measurements do not establish this protocol's performance.
 
 Read the [protocol specification](docs/protocol.md) for language-neutral interoperability rules and the [implementation guide](docs/implementation.md) for the solver, worked examples, API behavior, and adapters.
 
+## Install
+
+```sh
+npm install nut-fountain@alpha
+# or: bun add nut-fountain@alpha
+```
+
+ESM only. Supports modern browser bundlers and Node.js 22.4+; TypeScript consumers can use Bundler or NodeNext resolution. No TypeScript runtime dependency is required. QR rendering and camera access remain application responsibilities.
+
 ## Build and verify
 
-Run these commands from this package directory. For workspace and device setup, see the [repository README](../../README.md).
+Run these commands from this package directory. For workspace and device setup, see the [repository README](https://github.com/Egge21M/nut-fountain#readme).
 
 ```sh
 bun install
@@ -19,9 +28,9 @@ bun x playwright install chromium # Needed only if Chromium is not already cache
 bun run test:browser
 ```
 
-`build` produces ESM and declaration files in `dist/`. Browser applications should consume this local package through an ESM-capable bundler (for example, via a `file:` dependency); its dependencies are external in the package artifacts and resolved by the application bundler. The browser test does exactly this using the package export map. No global `Buffer` or `process` polyfill is required. `nut-fountain/core` can be imported without pulling in Cashu or UR code.
+`build` produces ESM and declaration files in `dist/`. Browser applications should consume the package through an ESM-capable bundler; its dependencies are external in the package artifacts and resolved by the application bundler. The browser test does exactly this using the package export map. No global `Buffer` or `process` polyfill is required. `nut-fountain/core` can be imported without pulling in Cashu or UR code.
 
-The [validation record](docs/validation.md) lists versions, commands, and coverage. No npm publication is part of this experiment.
+The [validation record](docs/validation.md) lists versions, commands, and coverage. `npm pack` rebuilds artifacts through `prepack`. Run `bun run test:package` from a committed checkout to verify a clean-checkout tarball in isolated Node, TypeScript and browser consumers.
 
 ## Choose a decoder
 
@@ -151,3 +160,7 @@ The supported convention is `ur:bytes` carrying a CBOR byte string whose payload
 | `nut-fountain` | All of the above |
 
 CBOR helpers encode CBOR-compatible values and decode exactly one item. Base64 helpers use the URL-safe alphabet; encoding omits padding and decoding accepts valid padded or unpadded input. Invalid input throws.
+
+## License
+
+MIT, copyright (c) 2026 Egge21M. See [LICENSE](LICENSE). Third-party material retains the notices in [NOTICE.md](NOTICE.md).

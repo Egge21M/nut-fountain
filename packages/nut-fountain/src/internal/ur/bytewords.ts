@@ -1,4 +1,4 @@
-import { crc32 } from '../crc32.ts';
+import { crc32 } from '../crc32.js';
 
 // Normative dictionary from Blockchain Commons BCR-2020-012 (Bytewords).
 // https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2020-012-bytewords.md

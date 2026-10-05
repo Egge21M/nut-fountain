@@ -5,6 +5,14 @@ Experimental binary fountain transport for Cashu tokens, with a browser playgrou
 - [`packages/nut-fountain`](packages/nut-fountain): the TypeScript library, protocol documentation, and compatibility tests. Its package name and public exports are unchanged.
 - [`apps/playground`](apps/playground): a Vite + React app that sends and scans animated **raw binary** QR frames.
 
+## Install the library
+
+```sh
+npm install nut-fountain@alpha
+```
+
+The library is ESM and experimental; APIs and wire compatibility may change. See the [library README](packages/nut-fountain/README.md) for usage. MIT license, copyright (c) 2026 Egge21M; third-party notices are retained in the package.
+
 ## Develop
 
 Use Bun 1.3.14 or newer:

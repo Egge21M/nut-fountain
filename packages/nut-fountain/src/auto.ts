@@ -1,5 +1,5 @@
-import { FountainDecoder } from './core.ts';
-import { UrDecoder } from './ur.ts';
+import { FountainDecoder } from './core.js';
+import { UrDecoder } from './ur.js';
 
 export type DecoderFormat = 'binary' | 'ur';
 

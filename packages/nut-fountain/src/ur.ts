@@ -1,8 +1,8 @@
-import { decodeCbor } from './encoding.ts';
-import { decodeBytewords } from './internal/ur/bytewords.ts';
-import { FragmentChooser } from './internal/ur/fragments.ts';
-import { FountainSolver } from './internal/fountain.ts';
-import { crc32 } from './internal/crc32.ts';
+import { decodeCbor } from './encoding.js';
+import { decodeBytewords } from './internal/ur/bytewords.js';
+import { FragmentChooser } from './internal/ur/fragments.js';
+import { FountainSolver } from './internal/fountain.js';
+import { crc32 } from './internal/crc32.js';
 
 const MAX_MESSAGE_BYTES = 1_048_576;
 const MAX_PART_CHARACTERS = 131_072;

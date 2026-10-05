@@ -1,11 +1,11 @@
-import { coefficients } from "./internal/core/equations.ts";
+import { coefficients } from "./internal/core/equations.js";
 import {
   parseFrame, serializeFrame, MAX_FRAGMENT_SIZE, MAX_FRAGMENTS, MAX_MESSAGE_LENGTH,
   type Metadata,
-} from "./internal/core/wire.ts";
+} from "./internal/core/wire.js";
 
-import { crc32 } from './internal/crc32.ts';
-import { FountainSolver } from './internal/fountain.ts';
+import { crc32 } from './internal/crc32.js';
+import { FountainSolver } from './internal/fountain.js';
 
 /** Experimental binary fountain transport. See docs/protocol.md for its wire format. */
 export class FountainEncoder {

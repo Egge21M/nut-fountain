@@ -1,5 +1,5 @@
-export { FountainEncoder, FountainDecoder } from './core';
-export { tokenToBytes, bytesToToken, bytesToTokenString, type Token } from './cashu';
-export { UrDecoder } from './ur';
-export { encodeCbor, decodeCbor, encodeBase64Url, decodeBase64Url } from './encoding';
-export { AutoDecoder, type DecoderFormat } from './auto';
+export { FountainEncoder, FountainDecoder } from './core.js';
+export { tokenToBytes, bytesToToken, bytesToTokenString, type Token } from './cashu.js';
+export { UrDecoder } from './ur.js';
+export { encodeCbor, decodeCbor, encodeBase64Url, decodeBase64Url } from './encoding.js';
+export { AutoDecoder, type DecoderFormat } from './auto.js';

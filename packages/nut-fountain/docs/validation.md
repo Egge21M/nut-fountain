@@ -12,7 +12,7 @@ bun run test
 bun run test:browser
 ```
 
-All 86 Bun tests pass (199 assertions). Coverage includes the public byte encoder/reader, repair-only recovery, loss and reordering, duplicates, malformed frames, integrity checks, independent version-1 wire bytes, Cashu conversions, encoding helpers, UR rejection and recovery, and the built core entry point. The UR suite includes 54 reference-generated cases across payload sizes, fragment counts, and high unsigned sequence numbers, plus independent URKit vectors. An additional transfer exceeds the custom protocol's 256-fragment limit to verify that the shared solver preserves UR's separate 1024-fragment bound. Buffer input and received-frame ownership regressions verify exact recovery after caller mutation and ensure decoding leaves caller frames unchanged. Type checking and ESM/declaration builds pass.
+All 103 library Bun tests pass (366 assertions). Coverage includes the public byte encoder/reader, repair-only recovery, loss and reordering, duplicates, malformed frames, integrity checks, independent version-1 wire bytes, Cashu conversions, encoding helpers, UR rejection and recovery, and the built core entry point. The UR suite includes 54 reference-generated cases across payload sizes, fragment counts, and high unsigned sequence numbers, plus independent URKit vectors. An additional transfer exceeds the custom protocol's 256-fragment limit to verify that the shared solver preserves UR's separate 1024-fragment bound. Buffer input and received-frame ownership regressions verify exact recovery after caller mutation and ensure decoding leaves caller frames unchanged. Type checking and ESM/declaration builds pass.
 
 The browser harness bundles a consumer that imports **built package entry points** through the export map, then executes it in actual Chromium. It verifies that global `Buffer` and `process` are absent before import and after execution. Reference UR fixtures are generated outside the browser using the pinned reference encoder, so the test does not need a public UR encoder in this package. The fixture proofs are not spendable.
 
@@ -42,3 +42,10 @@ Measured with Bun 1.3.14 using `Bun.build({entrypoints: ['src/ur.ts'], target: '
 | Gzipped JavaScript | 41,809 bytes | 11,756 bytes | 71.9% |
 
 These are bundle-size reductions for the standalone UR reader, not QR capacity or transfer-speed measurements. Applications sharing dependencies can see different savings.
+
+
+## Alpha release artifact verification
+
+Run `bun run test:package` from the package directory after committing changes. This check archives HEAD into a clean temporary checkout, installs with the frozen lockfile, asserts there is no pre-existing build, and invokes `npm pack` (which must build through `prepack`). It checks all exported JavaScript/declaration files and documentation/license files, then installs that exact tarball into an isolated production-only consumer.
+
+The consumer checks all six public entry points, binary repair recovery with loss, Cashu conversion, UR routing against an independent fixture, CBOR/base64 helpers, native Node ESM execution, strict TypeScript NodeNext and Bundler resolution, and execution of a browser bundle in Chromium without Node globals. It also checks that development-only dependencies and TypeScript are absent from the production installation. Successful output includes the source commit, tarball path, and npm integrity hash. Temporary files are retained for inspection and publication of the verified artifact.
