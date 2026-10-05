@@ -21,6 +21,8 @@ Tickets 01, 02 and 03 are independent. Ticket 04 depends on all three. Implement
 
 - Resolved [04 Browser integration](issues/04-browser-integration.md): built package and real Chromium acceptance; merge `69a9b26`, 25 tests, typecheck and eight browser checks passed.
 
+- Resolved [05 Review fixes](issues/05-review-fixes.md): owned byte boundaries and centralized wire layout; merge `34db42d`, exact tested-tree match, 28 tests and eight browser checks passed.
+
 ## Fog
 
 No outstanding product questions. API and wire details will be documented during implementation. The final code review compares against main (the pre-implementation baseline).
