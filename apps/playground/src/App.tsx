@@ -142,7 +142,7 @@ function Receiver() {
   const reader = useRef(new FountainDecoder());
   const importSession = useRef(0);
   const [reads, setReads] = useState(0);
-  const [useful, setUseful] = useState(0);
+  const [progress, setProgress] = useState({ value: 0, useful: 0, total: undefined as number | undefined });
   const [decoded, setDecoded] = useState('');
   const [issue, setIssue] = useState('');
   const [loading, setLoading] = useState(false);
@@ -151,7 +151,7 @@ function Receiver() {
     if (reader.current.isComplete) return true;
     setReads(value => value + 1);
     try {
-      if (reader.current.receive(bytes)) setUseful(value => value + 1);
+      reader.current.receive(bytes);
       setIssue('');
       if (reader.current.isComplete) { setDecoded(bytesToTokenString(reader.current.result!)); return true; }
     } catch (failure) {
@@ -162,13 +162,15 @@ function Receiver() {
       if (failure instanceof Error && failure.message.includes('another message')) {
         setIssue('This is a different transfer. Reset the reader to receive it.');
       }
+    } finally {
+      setProgress({ value: reader.current.progress, useful: reader.current.independentFrames, total: reader.current.fragmentCount });
     }
     return false;
   };
   const camera = useCamera(accept);
   const reset = () => {
     camera.stop(); importSession.current++; setLoading(false);
-    reader.current = new FountainDecoder(); setReads(0); setUseful(0); setDecoded(''); setIssue('');
+    reader.current = new FountainDecoder(); setReads(0); setProgress({ value: 0, useful: 0, total: undefined }); setDecoded(''); setIssue('');
   };
   const importImages = async (files: File[]) => {
     camera.stop(); const session = ++importSession.current;
@@ -186,6 +188,7 @@ function Receiver() {
     } finally { if (session === importSession.current) setLoading(false); }
   };
   const running = camera.phase !== 'idle';
+  const percent = Math.floor(progress.value * 100);
   return <>
     <div className="workspace receive-layout">
       <section className="panel camera-panel">
@@ -196,6 +199,13 @@ function Receiver() {
           <div className="viewfinder" />
           {camera.phase !== 'active' && <div className="camera-placeholder"><span>⌖</span><h3>{decoded ? 'All frames came together.' : 'Bring the other screen into view.'}</h3><p>{decoded ? 'Your reconstructed token is below.' : 'The rear camera is used when available.'}</p></div>}
         </div>
+        <div className="decoding-progress">
+          <div><span>Decoding progress</span><strong>{percent}%</strong></div>
+          <progress aria-label="Decoding progress" value={progress.value} max={1}
+            aria-valuetext={`${percent}%${progress.total === undefined ? ', waiting for first frame' : `, ${progress.useful} of ${progress.total} independent frames`}`} />
+          <p className="field-note">{progress.total === undefined ? 'Waiting for the first valid frame.'
+            : `${progress.useful} of ${progress.total} independent frames collected.`} Progress measures information collected, not time remaining.</p>
+        </div>
         <div className="camera-actions"><button className="button primary" disabled={Boolean(decoded) || loading}
           onClick={running ? camera.stop : camera.start}>{camera.phase === 'requesting' ? 'Cancel camera request' : running ? 'Stop camera' : 'Start camera'}</button>
           <button className="button secondary" onClick={reset}>Reset reader</button></div>
@@ -203,7 +213,7 @@ function Receiver() {
       <section className="panel receive-info">
         <div className="section-heading"><span className="step">01</span><h2>Collect the frames</h2></div>
         <p className="body-copy">Point your camera at a sending device. Hold it steady and keep the whole code in view.</p>
-        <div className="receive-stats"><div><strong>{reads}</strong><span>QR reads</span></div><div><strong>{useful}</strong><span>Useful frames</span></div></div>
+        <div className="receive-stats"><div><strong>{reads}</strong><span>QR reads</span></div><div><strong>{progress.useful}</strong><span>Useful frames</span></div></div>
         <p className="field-note">Repeated frames are normal. Decoding finishes when enough useful frames arrive.</p>
         <div className="divider" />
         <label className={'image-import ' + (loading || decoded ? 'disabled' : '')}>↥ {loading ? 'Reading QR images…' : 'Import QR images'}
@@ -212,7 +222,7 @@ function Receiver() {
         <p className="field-note">A camera-free alternative: select screenshots from a paused sender, one or more at a time.</p>
         {!window.isSecureContext && <p className="message">Use HTTPS to enable the camera on a phone. Image import works here too.</p>}
         {(camera.error || issue) && <p className="message error" role="alert">{issue || camera.error}</p>}
-        <div className="receive-status" role="status">{decoded ? '✓ Token reconstructed' : loading ? 'Reading frames…' : useful ? 'Collecting frames… keep scanning.' : 'Waiting for your first frame.'}</div>
+        <div className="receive-status" role="status">{decoded ? '✓ Token reconstructed' : loading ? 'Reading frames…' : progress.useful ? 'Collecting frames… keep scanning.' : 'Waiting for your first frame.'}</div>
       </section>
     </div>
     {decoded && <TokenResult token={decoded} />}

@@ -54,6 +54,16 @@ export class FountainDecoder {
   get isComplete(): boolean { return this.decoded !== undefined; }
   get result(): Uint8Array | undefined { return this.decoded?.slice(); }
 
+  /** Independent equations retained for this transfer, excluding redundant frames. */
+  get independentFrames(): number { return this.solver?.rank ?? 0; }
+  /** Source-fragment count; unknown until a frame establishes the transfer. */
+  get fragmentCount(): number | undefined { return this.metadata?.count; }
+  /** Information collected, from 0 to 1. A value of 1 means validated completion. */
+  get progress(): number {
+    if (this.isComplete) return 1;
+    return this.fragmentCount ? this.independentFrames / this.fragmentCount : 0;
+  }
+
   receive(frame: Uint8Array): boolean {
     const parsed = parseFrame(frame);
     const { sequence, count, length, size, checksum } = parsed;

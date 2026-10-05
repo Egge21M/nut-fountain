@@ -107,3 +107,11 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   footer { align-items: flex-start; flex-direction: column; margin-top: 35px; gap: 9px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+.decoding-progress { margin-top: 20px; }
+.decoding-progress > div { display: flex; justify-content: space-between; font-size: 12px; color: #51624f; }
+.decoding-progress strong { font-variant-numeric: tabular-nums; }
+.decoding-progress progress { display: block; width: 100%; height: 10px; margin-top: 10px; border: 0; border-radius: 6px; overflow: hidden; background: #e5eade; accent-color: #527b35; }
+.decoding-progress progress::-webkit-progress-bar { background: #e5eade; border-radius: 6px; }
+.decoding-progress progress::-webkit-progress-value { background: #527b35; border-radius: 6px; }
+.decoding-progress progress::-moz-progress-bar { background: #527b35; border-radius: 6px; }

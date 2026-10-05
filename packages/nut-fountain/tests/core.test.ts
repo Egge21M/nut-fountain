@@ -154,6 +154,56 @@ test("a valid frame checksum cannot bypass the reconstructed message checksum", 
   const decoder = new FountainDecoder();
   expect(() => decoder.receive(frame)).toThrow(/message checksum/);
   expect(decoder.isComplete).toBe(false);
+  expect(decoder.fragmentCount).toBe(1);
+  expect(decoder.independentFrames).toBe(0);
+  expect(decoder.progress).toBe(0);
   decoder.receive(new FountainEncoder(Uint8Array.of(1, 2, 3), { fragmentSize: 3 }).nextFrame());
   expect(decoder.result).toEqual(Uint8Array.of(1, 2, 3));
+});
+
+
+test("progress tracks independent information through loss, duplicates, rejection, completion and reset", () => {
+  const encoder = new FountainEncoder(Uint8Array.of(1, 2, 3, 4), { fragmentSize: 1 });
+  const frames = Array.from({ length: 4 }, () => encoder.nextFrame());
+  const decoder = new FountainDecoder();
+  expect(decoder.fragmentCount).toBeUndefined();
+  expect(decoder.independentFrames).toBe(0);
+  expect(decoder.progress).toBe(0);
+  expect(() => decoder.receive(new Uint8Array())).toThrow();
+  expect(decoder.fragmentCount).toBeUndefined();
+  decoder.receive(frames[2]!);
+  expect(decoder.fragmentCount).toBe(4);
+  expect(decoder.independentFrames).toBe(1);
+  expect(decoder.progress).toBe(0.25);
+  decoder.receive(frames[0]!);
+  expect(decoder.progress).toBe(0.5);
+  decoder.receive(frames[2]!);
+  const damaged = frames[1]!.slice();
+  damaged[damaged.length - 1] = damaged[damaged.length - 1]! ^ 1;
+  expect(() => decoder.receive(damaged)).toThrow();
+  expect(() => decoder.receive(new FountainEncoder(Uint8Array.of(9)).nextFrame())).toThrow();
+  expect(decoder.independentFrames).toBe(2);
+  expect(decoder.progress).toBe(0.5);
+  // The remaining two source frames are lost; use only repair frames from now on.
+  let previous = decoder.progress;
+  for (let i = 0; i < 100 && !decoder.isComplete; i++) {
+    decoder.receive(encoder.nextFrame());
+    expect(decoder.progress).toBeGreaterThanOrEqual(previous);
+    expect(decoder.progress).toBe(decoder.independentFrames / 4);
+    expect(decoder.progress === 1).toBe(decoder.isComplete);
+    previous = decoder.progress;
+  }
+  expect(decoder.result).toEqual(Uint8Array.of(1, 2, 3, 4));
+  expect(decoder.independentFrames).toBe(4);
+  expect(decoder.progress).toBe(1);
+  decoder.receive(frames[0]!);
+  expect(decoder.progress).toBe(1);
+  decoder.reset();
+  expect(decoder.fragmentCount).toBeUndefined();
+  expect(decoder.independentFrames).toBe(0);
+  expect(decoder.progress).toBe(0);
+  decoder.receive(new FountainEncoder(new Uint8Array()).nextFrame());
+  expect(decoder.fragmentCount).toBe(1);
+  expect(decoder.independentFrames).toBe(1);
+  expect(decoder.progress).toBe(1);
 });

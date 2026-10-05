@@ -44,11 +44,25 @@ try {
     }
   }
   await receive(page);
+  const bar = page.getByRole('progressbar', { name: 'Decoding progress' });
+  const value = () => bar.evaluate(element => (element as HTMLProgressElement).value);
+  assert.equal(await value(), 0);
+  const firstImage = { name: 'first.png', mimeType: 'image/png', buffer: Buffer.from(frames[0]!.split(',')[1]!, 'base64') };
+  await page.getByLabel('Import QR images').setInputFiles([firstImage]);
+  await page.waitForFunction(expected => document.querySelector('progress')?.value === expected, 1 / count);
+  assert.equal(await value(), 1 / count);
+  await page.getByLabel('Import QR images').setInputFiles([firstImage]);
+  await page.waitForFunction(() => document.querySelector('.receive-stats strong')?.textContent === '2');
+  assert.equal(await value(), 1 / count);
   await page.getByLabel('Import QR images').setInputFiles(frames.map((frame, i) => ({
     name: `${i}.png`, mimeType: 'image/png', buffer: Buffer.from(frame.split(',')[1]!, 'base64'),
   })));
   await page.getByRole('heading', { name: 'Token received' }).waitFor();
   assert.equal(await page.getByLabel('Decoded Cashu token').inputValue(), token);
+  assert.equal(await value(), 1);
+  await page.getByRole('button', { name: 'Reset reader' }).click();
+  assert.equal(await value(), 0);
+  passed.push('Progress reflects partial repair input, ignores duplicates, reaches 100% and resets');
   passed.push('Imported QR images reconstruct from repair frames with loss');
 
   const camera = await browser.newPage();

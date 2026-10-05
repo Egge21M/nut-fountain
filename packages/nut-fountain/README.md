@@ -42,6 +42,21 @@ const restored = decoder.result!; // Exact original bytes; a defensive copy.
 
 `FountainDecoder.receive()` returns whether the frame added an independent equation, **not** whether decoding is complete. Malformed frames and frames belonging to another message throw. Use `isComplete` and `result` for completion, and `reset()` before another transfer. See the [wire format](docs/protocol.md) for size bounds, checksums, and exact behavior.
 
+### Decoding progress
+
+`FountainDecoder` exposes three read-only properties:
+
+- `independentFrames`: the number of independent equations retained (initially `0`). Duplicate or redundant frames do not increase it.
+- `fragmentCount`: the required number of independent equations, known from the first accepted frame; `undefined` before a transfer starts or after `reset()`.
+- `progress`: `independentFrames / fragmentCount`, or `0` before the total is known. It reaches `1` only after reconstruction, message checksum and padding validation succeed.
+
+```ts
+const percent = Math.floor(decoder.progress * 100);
+console.log(`${percent}%`, decoder.independentFrames, decoder.fragmentCount);
+```
+
+This measures information collected toward reconstruction, not recovered bytes or time remaining. Lost frames leave progress unchanged; future frames can be redundant. Rejected frames do not advance progress, including a final equation rejected by message validation. `reset()` clears progress. The wire format is unchanged. These properties belong to the binary decoder, not `UrDecoder`.
+
 ## Cashu V4 tokens
 
 ```ts
