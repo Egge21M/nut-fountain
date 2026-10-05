@@ -1,0 +1,125 @@
+import { expect, test } from "bun:test";
+import { FountainDecoder, FountainEncoder } from "../src/core.ts";
+
+test("arbitrary bytes round-trip through fountain frames", () => {
+  const message = Uint8Array.from([0, 255, 1, 128, 7, 0, 12]);
+  const encoder = new FountainEncoder(message, { fragmentSize: 3 });
+  const decoder = new FountainDecoder();
+  expect(encoder.fragmentCount).toBe(3);
+  expect(decoder.result).toBeUndefined();
+  for (let i = 0; i < encoder.fragmentCount; i++) decoder.receive(encoder.nextFrame());
+  expect(decoder.isComplete).toBe(true);
+  expect(decoder.result).toEqual(message);
+});
+
+test("mixed repair frames recover lost source frames", () => {
+  const message = Uint8Array.from({ length: 73 }, (_, i) => i * 13);
+  const encoder = new FountainEncoder(message, { fragmentSize: 10 });
+  const decoder = new FountainDecoder();
+  for (let i = 0; i < encoder.fragmentCount; i++) {
+    const frame = encoder.nextFrame();
+    if (i !== 1 && i !== 4) decoder.receive(frame);
+  }
+  for (let i = 0; i < 100 && !decoder.isComplete; i++) decoder.receive(encoder.nextFrame());
+  expect(decoder.result).toEqual(message);
+});
+
+test("malformed, unsupported, and damaged frames are rejected without poisoning the reader", () => {
+  const message = Uint8Array.of(5, 0, 255);
+  const frame = new FountainEncoder(message).nextFrame();
+  const damaged = frame.slice();
+  damaged[damaged.length - 5] = damaged[damaged.length - 5]! ^ 1;
+  const unsupported = frame.slice();
+  unsupported[2] = 2;
+  const decoder = new FountainDecoder();
+  for (const invalid of [new Uint8Array(), frame.slice(0, -1), damaged, unsupported]) {
+    expect(() => decoder.receive(invalid)).toThrow();
+    expect(decoder.isComplete).toBe(false);
+  }
+  decoder.receive(frame);
+  expect(decoder.result).toEqual(message);
+});
+
+test("a reader rejects another message until reset, including after completion", () => {
+  const first = new FountainEncoder(Uint8Array.of(1, 2), { fragmentSize: 1 });
+  const second = new FountainEncoder(Uint8Array.of(3, 4), { fragmentSize: 1 });
+  const otherFrame = second.nextFrame();
+  const decoder = new FountainDecoder();
+  decoder.receive(first.nextFrame());
+  expect(() => decoder.receive(otherFrame)).toThrow();
+  decoder.receive(first.nextFrame());
+  expect(decoder.result).toEqual(Uint8Array.of(1, 2));
+  expect(() => decoder.receive(otherFrame)).toThrow();
+  decoder.reset();
+  expect(decoder.result).toBeUndefined();
+  expect(decoder.isComplete).toBe(false);
+  decoder.receive(otherFrame);
+  decoder.receive(second.nextFrame());
+  expect(decoder.result).toEqual(Uint8Array.of(3, 4));
+});
+
+test("unsupported sizes and non-byte inputs fail before encoding", () => {
+  for (const fragmentSize of [0, -1, 1.5, NaN, Infinity, 4097]) {
+    expect(() => new FountainEncoder(Uint8Array.of(1), { fragmentSize })).toThrow();
+  }
+  expect(() => new FountainEncoder(new Uint8Array(257), { fragmentSize: 1 })).toThrow();
+  expect(() => new FountainEncoder(new Uint8Array(1048577))).toThrow();
+  expect(() => new FountainEncoder([1, 2] as unknown as Uint8Array)).toThrow();
+  expect(() => new FountainDecoder().receive([1, 2] as unknown as Uint8Array)).toThrow();
+});
+
+test("an empty byte message completes after one fountain frame", () => {
+  const encoder = new FountainEncoder(new Uint8Array());
+  const decoder = new FountainDecoder();
+  expect(encoder.fragmentCount).toBe(1);
+  expect(decoder.receive(encoder.nextFrame())).toBe(true);
+  expect(decoder.isComplete).toBe(true);
+  expect(decoder.result).toEqual(new Uint8Array());
+});
+
+test("reordered and duplicate frames recover bytes without exposing mutable state", () => {
+  const original = Uint8Array.of(7, 0, 8, 255, 9);
+  const input = original.slice();
+  const encoder = new FountainEncoder(input, { fragmentSize: 2 });
+  input.fill(0);
+  const frames = Array.from({ length: encoder.fragmentCount }, () => encoder.nextFrame());
+  const decoder = new FountainDecoder();
+  expect(decoder.receive(frames[2]!)).toBe(true);
+  expect(decoder.receive(frames[2]!)).toBe(false);
+  decoder.receive(frames[0]!);
+  frames[0]!.fill(0);
+  decoder.receive(frames[1]!);
+  expect(decoder.receive(frames[1]!)).toBe(false);
+  expect(decoder.result).toEqual(original);
+  decoder.result!.fill(0);
+  expect(decoder.result).toEqual(original);
+});
+
+test("repair frames alone can reconstruct a message when all source frames are missed", () => {
+  const message = Uint8Array.from({ length: 256 }, (_, i) => i);
+  const encoder = new FountainEncoder(message, { fragmentSize: 1 });
+  const decoder = new FountainDecoder();
+  for (let i = 0; i < encoder.fragmentCount; i++) encoder.nextFrame();
+  for (let i = 0; i < 512 && !decoder.isComplete; i++) decoder.receive(encoder.nextFrame());
+  expect(decoder.result).toEqual(message);
+});
+
+test("the public encoder and reader match an independently calculated version-1 wire vector", () => {
+  // Header encoded with Python struct.pack('>IIII', ...), CRCs with Python zlib.crc32.
+  const frame = Uint8Array.from("4e46010000000001000000010000000355bc801d010203a3b35f2d".match(/../g)!, hex => parseInt(hex, 16));
+  const message = Uint8Array.of(1, 2, 3);
+  expect(new FountainEncoder(message, { fragmentSize: 3 }).nextFrame()).toEqual(frame);
+  const decoder = new FountainDecoder();
+  decoder.receive(frame);
+  expect(decoder.result).toEqual(message);
+});
+
+test("a valid frame checksum cannot bypass the reconstructed message checksum", () => {
+  // Independent frame CRC is valid, but its payload is 01 02 04 instead of 01 02 03.
+  const frame = Uint8Array.from("4e46010000000001000000010000000355bc801d0102043dd7ca8e".match(/../g)!, hex => parseInt(hex, 16));
+  const decoder = new FountainDecoder();
+  expect(() => decoder.receive(frame)).toThrow(/message checksum/);
+  expect(decoder.isComplete).toBe(false);
+  decoder.receive(new FountainEncoder(Uint8Array.of(1, 2, 3), { fragmentSize: 3 }).nextFrame());
+  expect(decoder.result).toEqual(Uint8Array.of(1, 2, 3));
+});
