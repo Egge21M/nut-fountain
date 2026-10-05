@@ -1,7 +1,7 @@
 # 04: Package integration and browser round trips
 
 Type: task
-Status: ready-for-agent
+Status: claimed
 Blocked by: 01, 02, 03
 
 Spec: [Package purpose](../spec.md)
@@ -17,3 +17,5 @@ Use the tdd skill at the public round-trip seams already agreed in the spec. Wor
 ## Comments
 
 - Created from the agreed purpose and goals; implementation details are delegated within this scope.
+
+- Claimed after tickets 01, 02 and 03 were merged and resolved.
