@@ -1,7 +1,7 @@
 # 04: Package integration and browser round trips
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: 01, 02, 03
 
 Spec: [Package purpose](../spec.md)
@@ -19,3 +19,7 @@ Use the tdd skill at the public round-trip seams already agreed in the spec. Wor
 - Created from the agreed purpose and goals; implementation details are delegated within this scope.
 
 - Claimed after tickets 01, 02 and 03 were merged and resolved.
+
+## Answer
+
+Implemented in `03ec6b8`, integrated by merge `69a9b26`. Added separately importable built ESM entry points, declarations, usage/protocol documentation and reproducible browser acceptance checks against build artifacts. Integration validation: `bun install --frozen-lockfile`, `bun run test` (25 tests, 126 assertions), `bun run typecheck`, and `bun run test:browser` all passed. The browser run used Playwright 1.63.0 and HeadlessChrome 153.0.8010.12, passing eight checks including exact arbitrary-byte recovery, string/object Cashu round trips, single/multipart UR text/binary round trips, and encoding utilities.

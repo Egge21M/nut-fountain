@@ -19,6 +19,8 @@ Tickets 01, 02 and 03 are independent. Ticket 04 depends on all three. Implement
 
 - Resolved [01 Byte core](issues/01-byte-core.md): versioned dependency-free binary transport and protocol document; merge `6314589`, combined 24 tests and typecheck passed.
 
+- Resolved [04 Browser integration](issues/04-browser-integration.md): built package and real Chromium acceptance; merge `69a9b26`, 25 tests, typecheck and eight browser checks passed.
+
 ## Fog
 
 No outstanding product questions. API and wire details will be documented during implementation. The final code review compares against main (the pre-implementation baseline).
