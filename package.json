@@ -1,11 +1,11 @@
 {
   "name": "nut-fountain",
-  "module": "index.ts",
   "type": "module",
   "private": true,
   "devDependencies": {
     "@types/bun": "latest",
-    "buffer": "6.0.3"
+    "buffer": "6.0.3",
+    "playwright": "1.63.0"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -14,5 +14,42 @@
     "@cashu/cashu-ts": "4.11.0",
     "@gandlaf21/bc-ur": "1.1.12",
     "cborg": "4.3.2"
+  },
+  "version": "0.0.0-experimental",
+  "description": "Experimental browser-compatible binary fountain transport with Cashu and inbound UR helpers",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js"
+    },
+    "./cashu": {
+      "types": "./dist/cashu.d.ts",
+      "import": "./dist/cashu.js"
+    },
+    "./ur": {
+      "types": "./dist/ur.d.ts",
+      "import": "./dist/ur.js"
+    },
+    "./encoding": {
+      "types": "./dist/encoding.d.ts",
+      "import": "./dist/encoding.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs/protocol.md"
+  ],
+  "scripts": {
+    "build": "bun scripts/build.ts",
+    "test": "bun run build && bun test tests",
+    "typecheck": "bun x tsc --noEmit",
+    "test:browser": "bun run build && bun scripts/browser.ts"
   }
 }

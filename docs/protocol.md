@@ -71,3 +71,13 @@ Message hexadecimal `010203`, fragment size 3, sequence 1, fragment count 1, mes
 ```
 
 The final frame CRC is `a3b35f2d`. This vector was computed independently using Python `struct.pack('>IIII', ...)` and `zlib.crc32`, and is verified through the public encoder and decoder tests.
+
+## Cashu mapping and inbound UR compatibility
+
+`tokenToBytes` maps Cashu V4 text or a cashu-ts `Token` object to `UTF8("crawB") || CBOR`, which becomes the exact input message to this binary transport. It preserves CBOR when converting text. Cashu token version B is independent of fountain format version 1. The core itself has no knowledge of Cashu, CBOR, or base64.
+
+UR decoding is a separate adapter using pinned `@gandlaf21/bc-ur@1.1.12`. It accepts complete single-part or multipart `ur:bytes` strings and unwraps a CBOR byte string. Supported Cashu payloads are UTF-8 `cashuB` text and `crawB` binary, both interpreted by `bytesToToken`/`bytesToTokenString`. Other UR types and non-byte CBOR payloads are rejected. These are the conventions tested against the reference encoder, not a claim about all NUT-16 wallets. The new binary frames are not UR-compatible output, and the package exposes no UR encoder.
+
+The UR adapter bounds the wrapped message to 1 MiB, source count to 1024, each input to 131072 characters, and each session to 8192 distinct parts and 16 MiB cumulative fragment bytes. It ignores duplicate sequence numbers and mismatched transfer metadata. A failed reconstructed checksum or malformed reconstructed CBOR clears the session. A completed result is a defensive copy; `reset()` starts a new transfer. These resource bounds do not constitute a production security audit of the reference implementation.
+
+Source references: [Cashu binary tokens](https://github.com/cashubtc/nuts/blob/main/00.md#binary-token), [NUT-16](https://github.com/cashubtc/nuts/blob/main/16.md), [UR multipart specification](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2024-001-multipart-ur.md).
