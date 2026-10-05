@@ -26,6 +26,8 @@ Browser checks pass for:
 - Published URKit single-part and multipart vectors, with dropped source frames.
 - CBOR and base64url convenience entry points.
 
+A separate clean installation using `bun install --production --frozen-lockfile` also built a browser consumer of the package exports. The installed dependency tree contained none of bc-ur, Buffer, JSBI, BigNumber, or alias-sampling.
+
 All 12 browser checks pass. Repair-only cases include dropped, reordered, repeated, and malformed inputs. The browser build audits the entire consumer import graph and fails if it resolves bc-ur, Buffer, JSBI, BigNumber, or alias-sampling.
 
 On a fresh machine, install the browser once with `bun x playwright install chromium`. The managed development server required permission to launch Chromium outside its restricted process sandbox; no browser-specific library shims were needed. Other browser engines, actual wallets, QR readers, performance comparisons, and adversarial resource-exhaustion audits were not part of this acceptance run.

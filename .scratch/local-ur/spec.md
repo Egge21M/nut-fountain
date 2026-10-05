@@ -1,6 +1,6 @@
 # Local UR decoder
 
-Status: Implementation in progress.
+Status: Implemented and verified. See [review](review.md) and [validation](../../docs/validation.md).
 
 Replace the @gandlaf21/bc-ur runtime dependency with local browser-native UR decoding while preserving UrDecoder's public API and the supported ur:bytes conventions. Keep the pinned reference package only as a development dependency for interoperability tests. Reuse CBOR and a small SHA-256 dependency; use native BigInt for the UR PRNG. Keep the custom binary wire format unchanged and share the Gaussian solver where useful.
 
