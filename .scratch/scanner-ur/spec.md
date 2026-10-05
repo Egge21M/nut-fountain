@@ -1,0 +1,3 @@
+# Scanner compatibility with existing UR tokens
+
+The library can decode both transports, but the demo routed all QR bytes to FountainDecoder. Connect the existing local UrDecoder to both camera and image imports. Auto-detect raw binary NF frames versus ASCII ur:bytes; support Cashu V4 strings in UR as used by the requested wallet convention, and binary crawB payloads. Preserve binary-only sending and prevent mixing active transfers. Retain accurate progress for both formats. Validate reference-generated single/multipart, uppercase/lowercase QR pixels and repair recovery; deploy to the existing personal Fly.io app.

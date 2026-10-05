@@ -4,6 +4,7 @@ import { bytesToToken, bytesToTokenString, tokenToBytes } from 'nut-fountain/cas
 import { drawFrame, readCanvas, readQrImage } from './qr';
 import { makeDemoToken } from './demo';
 import { useCamera } from './useCamera';
+import { TransferReader } from './reader';
 
 const demo = makeDemoToken();
 
@@ -139,7 +140,7 @@ function Sender({ token, setToken }: { token: string; setToken: (value: string) 
 }
 
 function Receiver() {
-  const reader = useRef(new FountainDecoder());
+  const reader = useRef(new TransferReader());
   const importSession = useRef(0);
   const [reads, setReads] = useState(0);
   const [progress, setProgress] = useState({ value: 0, useful: 0, total: undefined as number | undefined });
@@ -170,7 +171,7 @@ function Receiver() {
   const camera = useCamera(accept);
   const reset = () => {
     camera.stop(); importSession.current++; setLoading(false);
-    reader.current = new FountainDecoder(); setReads(0); setProgress({ value: 0, useful: 0, total: undefined }); setDecoded(''); setIssue('');
+    reader.current = new TransferReader(); setReads(0); setProgress({ value: 0, useful: 0, total: undefined }); setDecoded(''); setIssue('');
   };
   const importImages = async (files: File[]) => {
     camera.stop(); const session = ++importSession.current;
@@ -200,7 +201,7 @@ function Receiver() {
           {camera.phase !== 'active' && <div className="camera-placeholder"><span>⌖</span><h3>{decoded ? 'All frames came together.' : 'Bring the other screen into view.'}</h3><p>{decoded ? 'Your reconstructed token is below.' : 'The rear camera is used when available.'}</p></div>}
         </div>
         <div className="decoding-progress">
-          <div><span>Decoding progress</span><strong>{percent}%</strong></div>
+          <div><span>Decoding progress{reader.current.format ? ` · ${reader.current.format}` : ''}</span><strong>{percent}%</strong></div>
           <progress aria-label="Decoding progress" value={progress.value} max={1}
             aria-valuetext={`${percent}%${progress.total === undefined ? ', waiting for first frame' : `, ${progress.useful} of ${progress.total} independent frames`}`} />
           <p className="field-note">{progress.total === undefined ? 'Waiting for the first valid frame.'
@@ -212,7 +213,7 @@ function Receiver() {
       </section>
       <section className="panel receive-info">
         <div className="section-heading"><span className="step">01</span><h2>Collect the frames</h2></div>
-        <p className="body-copy">Point your camera at a sending device. Hold it steady and keep the whole code in view.</p>
+        <p className="body-copy">Scan a binary transfer from this demo or a wallet’s animated UR token. Hold steady and keep the whole code in view.</p>
         <div className="receive-stats"><div><strong>{reads}</strong><span>QR reads</span></div><div><strong>{progress.useful}</strong><span>Useful frames</span></div></div>
         <p className="field-note">Repeated frames are normal. Decoding finishes when enough useful frames arrive.</p>
         <div className="divider" />
@@ -226,7 +227,7 @@ function Receiver() {
       </section>
     </div>
     {decoded && <TokenResult token={decoded} />}
-    <div className="tip"><span>↳</span><p>This reader recognizes nut-fountain binary frames. Use the Send view on the other device; a regular wallet scanner may not understand this experimental format.</p></div>
+    <div className="tip"><span>↳</span><p>The reader automatically recognizes nut-fountain binary frames and ur:bytes containing cashuB text or a binary Cashu V4 token. Sending from this demo uses the new binary format.</p></div>
   </>;
 }
 

@@ -140,7 +140,39 @@ describe('existing UR input', () => {
       reader.receive(`${components[0]}/${components[1]}/${changed}`);
     }
     expect(reader.isComplete).toBe(false);
+    expect(reader.progress).toBe(0);
+    expect(reader.independentFrames).toBe(0);
+    expect(reader.fragmentCount).toBeUndefined();
     for (const part of parts) reader.receive(part);
     expect(reader.result).toEqual(payload);
   });
+});
+
+
+test('UR progress counts independent equations and resets after completion', () => {
+  const payload = Uint8Array.from({ length: 200 }, (_, i) => i);
+  const reference = new UREncoder(UR.fromBuffer(Buffer.from(payload)), 40);
+  const reader = new UrDecoder();
+  expect(reader.fragmentCount).toBeUndefined();
+  expect(reader.progress).toBe(0);
+  const parts = Array.from({ length: reference.fragmentsLength }, () => reference.nextPart());
+  reader.receive(parts[0]!);
+  expect(reader.fragmentCount).toBe(parts.length);
+  expect(reader.independentFrames).toBe(1);
+  expect(reader.progress).toBe(1 / parts.length);
+  reader.receive(parts[0]!);
+  reader.receive('ur:bytes/zz');
+  expect(reader.independentFrames).toBe(1);
+  expect(reader.progress).toBe(1 / parts.length);
+  for (const part of parts.slice(1)) reader.receive(part);
+  expect(reader.progress).toBe(1);
+  expect(reader.independentFrames).toBe(parts.length);
+  reader.reset();
+  expect(reader.progress).toBe(0);
+  expect(reader.fragmentCount).toBeUndefined();
+  expect(reader.independentFrames).toBe(0);
+  reader.receive(new UREncoder(UR.fromBuffer(Buffer.from(payload)), 4096).nextPart());
+  expect(reader.fragmentCount).toBe(1);
+  expect(reader.independentFrames).toBe(1);
+  expect(reader.progress).toBe(1);
 });

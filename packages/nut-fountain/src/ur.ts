@@ -27,9 +27,18 @@ export class UrDecoder {
   #received = new Set<number>();
   #receivedBytes = 0;
   #session: string | undefined;
+  #fragmentCount: number | undefined;
 
   get isComplete(): boolean { return this.#result !== undefined; }
   get result(): Uint8Array | undefined { return this.#result?.slice(); }
+  /** Independent equations, not the number of accepted UR sequence numbers. */
+  get independentFrames(): number { return this.#solver?.rank ?? (this.isComplete ? 1 : 0); }
+  get fragmentCount(): number | undefined { return this.#fragmentCount; }
+  /** Information collected, from 0 to 1; failed reconstruction resets to zero. */
+  get progress(): number {
+    if (this.isComplete) return 1;
+    return this.#fragmentCount ? this.independentFrames / this.#fragmentCount : 0;
+  }
 
   reset(): void {
     this.#solver = undefined;
@@ -38,6 +47,7 @@ export class UrDecoder {
     this.#received.clear();
     this.#receivedBytes = 0;
     this.#session = undefined;
+    this.#fragmentCount = undefined;
   }
 
   /** True for an accepted new part, false for invalid, duplicate or foreign input. */
@@ -54,6 +64,7 @@ export class UrDecoder {
         const payload = decodeCbor(cbor);
         if (!(payload instanceof Uint8Array)) return false;
         this.#result = new Uint8Array(payload);
+        this.#fragmentCount = 1;
         return true;
       }
       if (components.length !== 2 || !/^[1-9][0-9]*-[1-9][0-9]*$/.test(components[0]!)) return false;
@@ -74,6 +85,7 @@ export class UrDecoder {
       this.#chooser ??= new FragmentChooser(count);
       this.#solver.add(this.#chooser.choose(sequence, checksum), fragment);
       this.#session = session;
+      this.#fragmentCount = count;
       this.#received.add(sequence);
       this.#receivedBytes += fragment.length;
       if (this.#solver.rank === count) {

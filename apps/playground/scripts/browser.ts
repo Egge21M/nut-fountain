@@ -1,6 +1,15 @@
 import { strict as assert } from 'node:assert';
 import { resolve, sep } from 'node:path';
 import { chromium, type Page } from 'playwright';
+import QRCode from 'qrcode';
+import { tokenToBytes } from 'nut-fountain/cashu';
+import { urParts } from '../tests/ur-fixtures';
+
+const qrImages = async (parts: string[]) => Promise.all(parts.map(async part =>
+  'data:image/png;base64,' + (await QRCode.toBuffer(part, { errorCorrectionLevel: 'M', scale: 5, margin: 4 })).toString('base64')));
+const imageFiles = (images: string[]) => images.map((image, i) => ({
+  name: `${i}.png`, mimeType: 'image/png', buffer: Buffer.from(image.split(',')[1]!, 'base64'),
+}));
 
 const dist = resolve('dist');
 const server = Bun.serve({ hostname: '127.0.0.1', port: 0, async fetch(request) {
@@ -65,18 +74,35 @@ try {
   passed.push('Progress reflects partial repair input, ignores duplicates, reaches 100% and resets');
   passed.push('Imported QR images reconstruct from repair frames with loss');
 
+  for (const binary of [false, true]) for (const multipart of [false, true]) {
+    await receive(page);
+    const payload = binary ? tokenToBytes(token) : new TextEncoder().encode(token);
+    const parts = urParts(payload, multipart ? 100 : 4096);
+    const images = await qrImages(parts.map((part, i) => i % 2 ? part : part.toUpperCase()));
+    await page.getByLabel('Import QR images').setInputFiles(imageFiles(images.slice(0, 1)));
+    if (multipart) {
+      await page.waitForFunction(expected => document.querySelector('progress')?.value === expected, 1 / parts.length);
+      await page.getByLabel('Import QR images').setInputFiles(imageFiles(images));
+    }
+    await page.getByRole('heading', { name: 'Token received' }).waitFor();
+    assert.equal(await page.getByLabel('Decoded Cashu token').inputValue(), token);
+    assert.equal(await value(), 1);
+    passed.push(`${multipart ? 'Multipart' : 'Single-part'} UR ${binary ? 'binary token' : 'cashuB string'} images auto-detect and decode`);
+  }
+  const urFrames = await qrImages(urParts(new TextEncoder().encode(token), 100, true).map(part => part.toUpperCase()));
+
   const camera = await browser.newPage();
   camera.on('pageerror', error => failures.push(error.message));
   await camera.addInitScript(({ frames }) => {
-    const state = { stops: 0, delay: 0, deny: false, blank: false };
+    const state = { stops: 0, delay: 0, deny: false, blank: false, frames };
     Object.assign(window, { cameraTest: state });
     Object.defineProperty(navigator.mediaDevices, 'getUserMedia', { value: async () => {
       if (state.deny) throw new DOMException('Denied', 'NotAllowedError');
-      const images = await Promise.all(frames.map(async src => {
+      const images = await Promise.all(state.frames.map(async src => {
         const image = new Image(); image.src = src; await image.decode(); return image;
       }));
       const canvas = document.createElement('canvas');
-      canvas.width = images[0]!.width; canvas.height = images[0]!.height;
+      canvas.width = Math.max(...images.map(image => image.width)); canvas.height = Math.max(...images.map(image => image.height));
       const context = canvas.getContext('2d')!;
       let index = 0;
       const draw = () => {
@@ -125,6 +151,15 @@ try {
   await camera.getByRole('button', { name: 'Start camera', exact: true }).click();
   await camera.getByRole('alert').filter({ hasText: 'Camera access was denied' }).waitFor();
   passed.push('Permission denial displays an actionable message');
+
+  await camera.getByRole('button', { name: 'Reset reader' }).click();
+  await camera.evaluate(frames => Object.assign((window as any).cameraTest, { frames, deny: false, blank: false, delay: 0 }), urFrames);
+  await camera.getByRole('button', { name: 'Start camera', exact: true }).click();
+  await camera.getByRole('heading', { name: 'Token received' }).waitFor({ timeout: 30000 });
+  assert.equal(await camera.getByLabel('Decoded Cashu token').inputValue(), token);
+  await camera.waitForFunction(() => (window as any).cameraTest.stops === 5);
+  assert.equal(await camera.getByRole('progressbar').evaluate(element => (element as HTMLProgressElement).value), 1);
+  passed.push('Camera automatically decodes uppercase UR cashuB text from repair frames with loss, then stops');
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await mobile.goto(server.url.href);

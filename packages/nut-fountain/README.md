@@ -55,7 +55,7 @@ const percent = Math.floor(decoder.progress * 100);
 console.log(`${percent}%`, decoder.independentFrames, decoder.fragmentCount);
 ```
 
-This measures information collected toward reconstruction, not recovered bytes or time remaining. Lost frames leave progress unchanged; future frames can be redundant. Rejected frames do not advance progress, including a final equation rejected by message validation. `reset()` clears progress. The wire format is unchanged. These properties belong to the binary decoder, not `UrDecoder`.
+This measures information collected toward reconstruction, not recovered bytes or time remaining. Lost frames leave progress unchanged; future frames can be redundant. Rejected frames do not advance progress, including a final equation rejected by message validation. `reset()` clears progress. The wire format is unchanged. `UrDecoder` exposes the same properties. Its count includes the UR CBOR wrapper; single-part UR completes at 1/1. Unlike the binary decoder, failed UR message validation resets the session and its progress to zero. Accepted but linearly dependent UR parts do not advance progress.
 
 ## Cashu V4 tokens
 
