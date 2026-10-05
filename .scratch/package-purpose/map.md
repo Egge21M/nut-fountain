@@ -1,0 +1,18 @@
+# Implementation graph
+
+Spec: [Package purpose](spec.md)
+
+## Notes
+
+Tickets 01, 02 and 03 are independent. Ticket 04 depends on all three. Implementation runs on integration/package-purpose; each ticket uses an isolated branch and worktree. Public test seams are the byte round trip, Cashu conversions, UR input and browser end-to-end round trips confirmed in the spec.
+
+## Decisions so far
+
+- [01 Byte core](issues/01-byte-core.md)
+- [02 Cashu helpers](issues/02-cashu-helpers.md)
+- [03 UR reader](issues/03-ur-reader.md)
+- [04 Browser integration](issues/04-browser-integration.md)
+
+## Fog
+
+No outstanding product questions. API and wire details will be documented during implementation. The final code review compares against main (the pre-implementation baseline).
