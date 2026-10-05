@@ -49,3 +49,15 @@ Browser tests require Chromium installed for Playwright (`bunx playwright instal
 Production assets are in `apps/playground/dist`; library artifacts are in `packages/nut-fountain/dist`. Use `bun run preview` after building to preview the app on port 4173. Camera access on a remote preview still requires trusted HTTPS.
 
 See the [library README](packages/nut-fountain/README.md) for APIs and [wire protocol](packages/nut-fountain/docs/protocol.md) for the experimental format.
+
+## Fly.io deployment
+
+The playground is deployed at https://nut-fountain.fly.dev in the `personal` organization.
+
+To deploy changes from the repository root:
+
+```sh
+flyctl deploy --remote-only --ha=false
+```
+
+`Dockerfile` builds the workspace with the frozen Bun lockfile, then serves only the generated app assets with nginx. `fly.toml` enables HTTPS, a health check, and one shared CPU with 256 MB RAM in Frankfurt. The machine stops while idle and starts on requests, so the first visit after inactivity can take a moment. The deployed HTTPS origin supports phone camera permissions without a development certificate.
