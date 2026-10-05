@@ -1,105 +1,51 @@
 # nut-fountain
 
-An experimental, browser-compatible TypeScript package for developing a binary fountain transport specification. It encodes arbitrary bytes into versioned binary fountain frames, reconstructs those bytes, and provides Cashu V4 helpers and an inbound UR reader. The package is private and has not been published; wire compatibility may change.
+Experimental binary fountain transport for Cashu tokens, with a browser playground for device testing.
 
-QR rendering, camera scanning, wallet integration, and comparative performance claims are outside this implementation. Its new dense GF(2) fountain protocol differs from the earlier POC; that POC's efficiency measurements do not establish this protocol's performance.
+- [`packages/nut-fountain`](packages/nut-fountain): the TypeScript library, protocol documentation, and compatibility tests. Its package name and public exports are unchanged.
+- [`apps/playground`](apps/playground): a Vite + React app that sends and scans animated **raw binary** QR frames.
 
-## Build and verify
+## Develop
+
+Use Bun 1.3.14 or newer:
 
 ```sh
 bun install
-bun run build
+bun run dev
+```
+
+Open http://localhost:5173. The app starts with a synthetic, non-spendable Cashu token. Press **Start sending** to display animated QR frames, or **Run local QR test** to reconstruct the token from the rendered QR pixels on the same device.
+
+The root dev command builds the library before starting Vite. App edits reload automatically; after editing the library, run `bun run build:lib` or restart the dev command.
+
+## Test with a phone
+
+1. Make the app reachable from both devices. Vite listens on `0.0.0.0:5173`. On a local machine, use its LAN address; on a remote server, use your environment's port forwarding or HTTPS proxy.
+2. Serve it over **trusted HTTPS** for phone camera access. `bun run dev:https` enables a self-signed development certificate; your phone must trust it. Dismissing a certificate warning may not be sufficient. A trusted HTTPS proxy is usually easier. Plain HTTP works for camera access on `localhost`, but not at an ordinary LAN address. See [browser camera requirements](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#privacy_and_security).
+3. On one device, open **Send** and press **Start sending**. On the other, open **Receive**, press **Start camera**, and allow camera access. Keep the whole code in view until the token appears.
+4. Adjust the frame rate or choose smaller fragments if scanning is difficult. Copy the reconstructed token to compare it with the sender.
+
+For a forwarded hostname, allow that specific host if Vite requests it:
+
+```sh
+PLAYGROUND_ALLOWED_HOSTS=your-development-host.example bun run dev
+```
+
+You can also use **Next frame** on the sender and import screenshots with **Import QR images** on the receiver. Image import does not require camera permission or HTTPS.
+
+Tokens are processed locally, without uploads, storage, or mint calls. The app reads the scanner's binary data directly; it does not encode fountain frames as base64, UTF-8 text, or UR. The device reader currently accepts only this experimental binary format; the library still exposes its UR compatibility decoder.
+
+## Validate and build
+
+```sh
 bun run typecheck
 bun run test
-bun x playwright install chromium # Needed only if Chromium is not already cached.
 bun run test:browser
+bun run build
 ```
 
-`build` produces ESM and declaration files in `dist/`. Browser applications should consume this local package through an ESM-capable bundler (for example, via a `file:` dependency); its dependencies are external in the package artifacts and resolved by the application bundler. The browser test does exactly this using the package export map. No global `Buffer` or `process` polyfill is required. `nut-fountain/core` can be imported without pulling in Cashu or UR code.
+Browser tests require Chromium installed for Playwright (`bunx playwright install chromium`). They cover library compatibility, QR pixel decoding, app round trips, image import with missing frames, simulated camera input, permission errors, camera cleanup, and mobile layout. Simulated camera tests do not replace a physical phone test.
 
-The [validation record](docs/validation.md) lists versions, commands, and coverage. No npm publication is part of this experiment.
+Production assets are in `apps/playground/dist`; library artifacts are in `packages/nut-fountain/dist`. Use `bun run preview` after building to preview the app on port 4173. Camera access on a remote preview still requires trusted HTTPS.
 
-## Arbitrary bytes
-
-```ts
-import { FountainEncoder, FountainDecoder } from 'nut-fountain/core';
-
-const message = new TextEncoder().encode('hello');
-const encoder = new FountainEncoder(message, { fragmentSize: 128 });
-const decoder = new FountainDecoder();
-
-// A local round trip. In an application, send each frame through your transport.
-for (let i = 0; i < encoder.fragmentCount; i++) {
-  decoder.receive(encoder.nextFrame());
-}
-if (!decoder.isComplete) throw new Error('Transfer incomplete');
-const restored = decoder.result!; // Exact original bytes; a defensive copy.
-```
-
-`nextFrame()` first emits source fragments, then repair frames. A receiver can accept reordering and duplicates and recover from lost source frames using repair frames. A real sender continues generating frames until the receiver completes or the application stops the transfer; there is no fixed completion bound under arbitrary loss. The example sends all source frames without loss.
-
-`FountainDecoder.receive()` returns whether the frame added an independent equation, **not** whether decoding is complete. Malformed frames and frames belonging to another message throw. Use `isComplete` and `result` for completion, and `reset()` before another transfer. See the [wire format](docs/protocol.md) for size bounds, checksums, and exact behavior.
-
-## Cashu V4 tokens
-
-```ts
-import { Amount, type Token } from '@cashu/cashu-ts';
-import { FountainEncoder, FountainDecoder } from 'nut-fountain/core';
-import { tokenToBytes, bytesToToken, bytesToTokenString } from 'nut-fountain/cashu';
-
-// A structurally valid fixture, not spendable money.
-const token: Token = {
-  mint: 'https://mint.example',
-  unit: 'sat',
-  proofs: [{
-    id: '009a1f293253e41e', amount: Amount.from(1),
-    secret: 'not-spendable', C: '02' + '11'.repeat(32),
-  }],
-};
-// A cashuB string is also accepted in place of token.
-const encoder = new FountainEncoder(tokenToBytes(token));
-const decoder = new FountainDecoder();
-for (let i = 0; i < encoder.fragmentCount; i++) decoder.receive(encoder.nextFrame());
-if (!decoder.isComplete) throw new Error('Transfer incomplete');
-const recoveredToken = bytesToToken(decoder.result!);
-const cashuB = bytesToTokenString(decoder.result!);
-```
-
-`tokenToBytes` returns `crawB` binary bytes. Text conversion preserves the original CBOR and produces unpadded base64url text. Object input uses the public `Token` shape in pinned `@cashu/cashu-ts@4.11.0`, including `Amount` values. Object conversions promise equivalent contents rather than identical serialization: cashu-ts defaults missing units to `sat` and normalizes witness metadata to JSON strings. Full keyset IDs from objects are preserved; already shortened IDs in input cannot be expanded without additional information. Helpers do not contact a mint or validate whether proofs are spendable. `cashuA` is unsupported.
-
-## Existing UR input
-
-```ts
-import { UrDecoder } from 'nut-fountain/ur';
-import { bytesToToken, bytesToTokenString } from 'nut-fountain/cashu';
-
-export function readUrParts(parts: Iterable<string>) {
-  const reader = new UrDecoder();
-  for (const part of parts) {
-    reader.receive(part); // The complete UR string, including ur:bytes/.
-    if (reader.isComplete) {
-      return {
-        token: bytesToToken(reader.result!),
-        cashuB: bytesToTokenString(reader.result!),
-      };
-    }
-  }
-  throw new Error('More UR parts are needed');
-}
-```
-
-The supported convention is `ur:bytes` carrying a CBOR byte string whose payload is either UTF-8 `cashuB` text or `crawB` binary. Single-part and multipart inputs, including uppercase strings, are accepted. `UrDecoder` removes UR/Bytewords/CBOR framing and returns payload bytes; the Cashu helpers interpret either payload representation. The package does not encode UR. Its local decoder uses native `BigInt` and `Uint8Array`, with `cborg` for CBOR and `@noble/hashes` for SHA-256. `@gandlaf21/bc-ur` is development-only and generates interoperability fixtures; it is not in the runtime import graph. See [third-party notices](NOTICE.md) for protocol material and fixture attribution.
-
-`UrDecoder.receive()` returns whether a new part was accepted; it returns `false` for malformed, duplicate, foreign, over-limit, or post-completion input. It does **not** indicate completion. Use `isComplete`, `result`, and `reset()` as with the binary reader. A failed reconstructed UR message resets the session; a successfully reconstructed non-Cashu byte payload is rejected by the Cashu helper. [NUT-16](https://github.com/cashubtc/nuts/blob/main/16.md) does not fix the exact UR payload mapping, so these conventions do not establish compatibility with every wallet.
-
-## Entry points
-
-| Import | Exports |
-| --- | --- |
-| `nut-fountain/core` | `FountainEncoder`, `FountainDecoder` |
-| `nut-fountain/cashu` | `tokenToBytes`, `bytesToToken`, `bytesToTokenString`, type `Token` |
-| `nut-fountain/ur` | `UrDecoder` |
-| `nut-fountain/encoding` | `encodeCbor`, `decodeCbor`, `encodeBase64Url`, `decodeBase64Url` |
-| `nut-fountain` | All of the above |
-
-CBOR helpers encode CBOR-compatible values and decode exactly one item. Base64 helpers use the URL-safe alphabet; encoding omits padding and decoding accepts valid padded or unpadded input. Invalid input throws.
+See the [library README](packages/nut-fountain/README.md) for APIs and [wire protocol](packages/nut-fountain/docs/protocol.md) for the experimental format.

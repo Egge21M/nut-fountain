@@ -1,0 +1,31 @@
+{
+  "name": "@nut-fountain/playground",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "dev:https": "PLAYGROUND_HTTPS=1 vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "bun test tests",
+    "test:browser": "bun scripts/browser.ts"
+  },
+  "dependencies": {
+    "nut-fountain": "workspace:*",
+    "@cashu/cashu-ts": "4.11.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "qrcode": "1.5.4",
+    "jsqr": "1.4.0"
+  },
+  "devDependencies": {
+    "vite": "8.3.2",
+    "@vitejs/plugin-react": "6.1.2",
+    "@vitejs/plugin-basic-ssl": "2.3.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/qrcode": "1.5.6"
+  }
+}
