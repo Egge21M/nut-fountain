@@ -1,8 +1,11 @@
-import { coefficients, xor, type Equation } from "./internal/core/equations.ts";
+import { coefficients } from "./internal/core/equations.ts";
 import {
-  crc32, parseFrame, serializeFrame, MAX_FRAGMENT_SIZE, MAX_FRAGMENTS, MAX_MESSAGE_LENGTH,
+  parseFrame, serializeFrame, MAX_FRAGMENT_SIZE, MAX_FRAGMENTS, MAX_MESSAGE_LENGTH,
   type Metadata,
 } from "./internal/core/wire.ts";
+
+import { crc32 } from './internal/crc32.ts';
+import { FountainSolver } from './internal/fountain.ts';
 
 /** Experimental binary fountain transport. See docs/protocol.md for its wire format. */
 export class FountainEncoder {
@@ -44,7 +47,7 @@ export class FountainEncoder {
 }
 
 export class FountainDecoder {
-  private rows = new Map<number, Equation>();
+  private solver?: FountainSolver;
   private decoded?: Uint8Array;
   private metadata?: Metadata;
 
@@ -59,35 +62,15 @@ export class FountainDecoder {
       throw new Error("Frame belongs to another message; reset the decoder first");
     }
     if (this.isComplete) return false;
-    const equation = { coefficients: coefficients(sequence, count), data: parsed.data };
-    let pivot = -1;
-    for (let i = 0; i < count; i++) {
-      if (!equation.coefficients[i]) continue;
-      const row = this.rows.get(i);
-      if (row) {
-        xor(equation.coefficients, row.coefficients);
-        xor(equation.data, row.data);
-      } else {
-        pivot = i;
-        break;
-      }
-    }
-    if (pivot < 0) return false;
+    this.solver ??= new FountainSolver(count, size);
+    const pivot = this.solver.add(coefficients(sequence, count), parsed.data);
+    if (pivot === undefined) return false;
     this.metadata ??= { count, length, size, checksum };
-    this.rows.set(pivot, equation);
-    if (this.rows.size === count) {
-      const message = new Uint8Array(count * size);
-      for (let i = count - 1; i >= 0; i--) {
-        const row = this.rows.get(i)!;
-        const fragment = row.data.slice();
-        for (let j = i + 1; j < count; j++) {
-          if (row.coefficients[j]) xor(fragment, message.subarray(j * size, (j + 1) * size));
-        }
-        message.set(fragment, i * size);
-      }
+    if (this.solver.isComplete) {
+      const message = this.solver.recover();
       const decoded = message.slice(0, length);
       if (crc32(decoded) !== checksum || message.subarray(length).some(byte => byte !== 0)) {
-        this.rows.delete(pivot);
+        this.solver.discard(pivot);
         throw new Error("Reconstructed message checksum or padding mismatch; reset may be required");
       }
       this.decoded = decoded;
@@ -95,5 +78,5 @@ export class FountainDecoder {
     return true;
   }
 
-  reset(): void { this.rows.clear(); this.decoded = undefined; this.metadata = undefined; }
+  reset(): void { this.solver = undefined; this.decoded = undefined; this.metadata = undefined; }
 }

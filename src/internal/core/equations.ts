@@ -17,9 +17,3 @@ export function coefficients(sequence: number, count: number): Uint8Array {
   if (degree === 0) bits[(sequence - 1) % count] = 1;
   return bits;
 }
-
-export function xor(target: Uint8Array, source: Uint8Array): void {
-  for (let i = 0; i < target.length; i++) target[i] = target[i]! ^ source[i]!;
-}
-
-export type Equation = { coefficients: Uint8Array; data: Uint8Array };

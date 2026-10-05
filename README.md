@@ -88,7 +88,7 @@ export function readUrParts(parts: Iterable<string>) {
 }
 ```
 
-The supported convention is `ur:bytes` carrying a CBOR byte string whose payload is either UTF-8 `cashuB` text or `crawB` binary. Single-part and multipart inputs, including uppercase strings, are accepted. `UrDecoder` removes UR/Bytewords/CBOR framing and returns payload bytes; the Cashu helpers interpret either payload representation. The package does not encode UR.
+The supported convention is `ur:bytes` carrying a CBOR byte string whose payload is either UTF-8 `cashuB` text or `crawB` binary. Single-part and multipart inputs, including uppercase strings, are accepted. `UrDecoder` removes UR/Bytewords/CBOR framing and returns payload bytes; the Cashu helpers interpret either payload representation. The package does not encode UR. Its local decoder uses native `BigInt` and `Uint8Array`, with `cborg` for CBOR and `@noble/hashes` for SHA-256. `@gandlaf21/bc-ur` is development-only and generates interoperability fixtures; it is not in the runtime import graph. See [third-party notices](NOTICE.md) for protocol material and fixture attribution.
 
 `UrDecoder.receive()` returns whether a new part was accepted; it returns `false` for malformed, duplicate, foreign, over-limit, or post-completion input. It does **not** indicate completion. Use `isComplete`, `result`, and `reset()` as with the binary reader. A failed reconstructed UR message resets the session; a successfully reconstructed non-Cashu byte payload is rejected by the Cashu helper. [NUT-16](https://github.com/cashubtc/nuts/blob/main/16.md) does not fix the exact UR payload mapping, so these conventions do not establish compatibility with every wallet.
 
