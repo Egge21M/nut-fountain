@@ -1,6 +1,6 @@
 # 01: Reject invalid witness metadata at the Cashu boundary
 
-Status: ready-for-agent
+Status: resolved
 Severity: P2
 Axis: Spec
 Reviewed commit: cdb04b955907ab364cbb2505996c525185258402
@@ -17,3 +17,7 @@ Reproduction: /tmp/nut-fountain-publication-review/witness.ts. Uses fixture mint
 ## Acceptance
 
 Validate or normalize optional witness metadata at the boundary so returned tokens satisfy the public Token shape. Reject malformed wire witnesses and add a regression through the public helpers. Preserve valid witness normalization and original CBOR for supported text tokens.
+
+## Resolution
+
+2026-10-05: Validate the original CBOR witness field as text, including falsy malformed values that cashu-ts omits. Eight malformed wire variants are rejected by binary/text/UR-payload helper paths; valid object witnesses still normalize to strings and text CBOR remains unchanged. The regressions failed before the fix and pass afterward.

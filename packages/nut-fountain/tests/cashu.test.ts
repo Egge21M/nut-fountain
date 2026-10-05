@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { Amount, getEncodedToken, type Token } from '@cashu/cashu-ts';
 import { tokenToBytes, bytesToToken, bytesToTokenString } from '../src/cashu';
+import { decodeCbor, encodeCbor, encodeBase64Url } from '../src/encoding';
 
 const token: Token = {
   mint: 'https://mint.example',
@@ -59,4 +60,27 @@ test('a binary token cannot hide trailing data after its CBOR payload', () => {
   const extra = new Uint8Array(valid.length + 1);
   extra.set(valid);
   expect(() => bytesToToken(extra)).toThrow();
+});
+
+for (const witness of [123, 0, true, false, null, [], {}, { signatures: ['signature'] }]) {
+  test(`rejects non-text CBOR witness ${JSON.stringify(witness)} through every Cashu input path`, () => {
+    const valid = tokenToBytes(token);
+    const wire = decodeCbor(valid.subarray(5)) as { t: { p: { w?: unknown }[] }[] };
+    wire.t[0]!.p[0]!.w = witness;
+    const cbor = encodeCbor(wire);
+    const binary = new Uint8Array(5 + cbor.length);
+    binary.set(valid.subarray(0, 5)); binary.set(cbor, 5);
+    const text = 'cashuB' + encodeBase64Url(cbor);
+    expect(() => bytesToToken(binary)).toThrow(/witness/);
+    expect(() => bytesToTokenString(binary)).toThrow(/witness/);
+    expect(() => tokenToBytes(text)).toThrow(/witness/);
+    expect(() => bytesToToken(new TextEncoder().encode(text))).toThrow(/witness/);
+  });
+}
+
+test('object witness inputs normalize to text and retain that text CBOR exactly', () => {
+  const witness = { signatures: ['test-signature'] };
+  const binary = tokenToBytes({ ...token, proofs: [{ ...token.proofs[0]!, witness }] });
+  expect(bytesToToken(binary).proofs[0]!.witness).toBe(JSON.stringify(witness));
+  expect(tokenToBytes(bytesToTokenString(binary))).toEqual(binary);
 });

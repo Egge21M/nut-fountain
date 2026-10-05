@@ -37,7 +37,14 @@ function normalizeTokenBytes(bytes: Uint8Array): Uint8Array {
 export function bytesToToken(bytes: Uint8Array): Token {
   bytes = normalizeTokenBytes(bytes);
   const token = getDecodedTokenBinary(bytes);
-  decodeCbor(bytes.subarray(binaryPrefix.length));
+  // cashu-ts validates the token/group structure but drops falsy witnesses.
+  // Inspect the wire field too, so values such as 0, false and null cannot hide.
+  const wire = decodeCbor(bytes.subarray(binaryPrefix.length)) as { t: { p: Record<string, unknown>[] }[] };
+  for (const group of wire.t) for (const proof of group.p) {
+    if (Object.hasOwn(proof, 'w') && typeof proof.w !== 'string') {
+      throw new Error('Invalid Cashu V4 witness: expected serialized text');
+    }
+  }
   if (typeof token.mint !== 'string' || token.mint.length === 0 ||
       typeof token.unit !== 'string' || token.unit.length === 0 ||
       token.proofs.length === 0 ||
