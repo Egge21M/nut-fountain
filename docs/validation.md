@@ -12,7 +12,7 @@ bun run test
 bun run test:browser
 ```
 
-All 25 Bun tests pass (126 assertions). Coverage includes the public byte encoder/reader, repair-only recovery, loss and reordering, duplicates, malformed frames, integrity checks, independent version-1 wire bytes, Cashu conversions, encoding helpers, UR rejection and recovery, and the built core entry point. Type checking and ESM/declaration builds pass.
+All 28 Bun tests pass (132 assertions). Coverage includes the public byte encoder/reader, repair-only recovery, loss and reordering, duplicates, malformed frames, integrity checks, independent version-1 wire bytes, Cashu conversions, encoding helpers, UR rejection and recovery, and the built core entry point. Buffer input and received-frame ownership regressions verify exact recovery after caller mutation and ensure decoding leaves caller frames unchanged. Type checking and ESM/declaration builds pass.
 
 The browser harness bundles a consumer that imports **built package entry points** through the export map, then executes it in actual Chromium. It verifies that global `Buffer` and `process` are absent before import and after execution. Reference UR fixtures are generated outside the browser using the pinned reference encoder, so the test does not need a public UR encoder in this package. The fixture proofs are not spendable.
 
