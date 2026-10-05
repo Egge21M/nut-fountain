@@ -25,7 +25,7 @@ Tickets 01, 02 and 03 are independent. Ticket 04 depends on all three. Implement
 
 ## Fog
 
-No outstanding product questions. API and wire details will be documented during implementation. The final code review compares against main (the pre-implementation baseline).
+No outstanding product questions or implementation tickets. API and wire details are documented in README.md and docs/protocol.md. The final review against main is recorded in review.md; both review axes have no outstanding findings.
 
 ## Review follow-up
 

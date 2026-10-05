@@ -1,6 +1,6 @@
 # Package purpose and goals
 
-Status: Purpose and goals agreed through the design interview. Implementation is in progress; see map.md for the task graph.
+Status: Implemented on integration/package-purpose. All acceptance checks passed in Chromium; all local tickets and code review findings are resolved. See [task graph](map.md), [review](review.md), and [validation](../../docs/validation.md).
 
 ## Confirmed
 
