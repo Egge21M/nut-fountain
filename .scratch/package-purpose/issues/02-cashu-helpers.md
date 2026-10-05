@@ -1,7 +1,7 @@
 # 02: Cashu V4 and encoding helpers
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: None
 
 Spec: [Package purpose](../spec.md)
@@ -19,3 +19,7 @@ Use the tdd skill at the public round-trip seams already agreed in the spec. Wor
 - Created from the agreed purpose and goals; implementation details are delegated within this scope.
 
 - Claimed by the corresponding implementer on its isolated worktree.
+
+## Answer
+
+Implemented in `2242fc9`, integrated by merge `99e0bb3`. Browser-native Cashu V4 helpers preserve original CBOR for text round trips and use the public cashu-ts Token shape for object conversions. Added strict base64url and CBOR utilities. Integration validation: `bun test tests/cashu.test.ts tests/encoding.test.ts` passed 8 tests and 27 assertions; `bunx tsc --noEmit` passed.
