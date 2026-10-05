@@ -4,6 +4,8 @@ An experimental, browser-compatible TypeScript package for developing a binary f
 
 QR rendering and camera scanning live in the separate [device playground](../../apps/playground), outside this library. Wallet integration and comparative performance claims are outside this implementation. Its new dense GF(2) fountain protocol differs from the earlier POC; that POC's efficiency measurements do not establish this protocol's performance.
 
+Read the [protocol specification](docs/protocol.md) for language-neutral interoperability rules and the [implementation guide](docs/implementation.md) for the solver, worked examples, API behavior, and adapters.
+
 ## Build and verify
 
 Run these commands from this package directory. For workspace and device setup, see the [repository README](../../README.md).
@@ -68,7 +70,7 @@ const restored = decoder.result!; // Exact original bytes; a defensive copy.
 
 `nextFrame()` first emits source fragments, then repair frames. A receiver can accept reordering and duplicates and recover from lost source frames using repair frames. A real sender continues generating frames until the receiver completes or the application stops the transfer; there is no fixed completion bound under arbitrary loss. The example sends all source frames without loss.
 
-`FountainDecoder.receive()` returns whether the frame added an independent equation, **not** whether decoding is complete. Malformed frames and frames belonging to another message throw. Use `isComplete` and `result` for completion, and `reset()` before another transfer. See the [wire format](docs/protocol.md) for size bounds, checksums, and exact behavior.
+`FountainDecoder.receive()` returns whether the frame added an independent equation, **not** whether decoding is complete. Malformed frames and frames belonging to another message throw. Use `isComplete` and `result` for completion, and `reset()` before another transfer. See the [protocol specification](docs/protocol.md) for wire bounds and checksums, and the [implementation guide](docs/implementation.md#decoder-state-progress-and-errors) for exact API and error behavior.
 
 ### Decoding progress
 

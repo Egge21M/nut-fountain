@@ -50,6 +50,7 @@
     "dist",
     "README.md",
     "docs/protocol.md",
+    "docs/implementation.md",
     "NOTICE.md"
   ],
   "scripts": {
