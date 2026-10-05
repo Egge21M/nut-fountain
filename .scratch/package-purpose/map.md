@@ -15,6 +15,8 @@ Tickets 01, 02 and 03 are independent. Ticket 04 depends on all three. Implement
 
 - Resolved [02 Cashu helpers](issues/02-cashu-helpers.md): strict browser-native V4 and encoding helpers; merge `99e0bb3`, eight tests and typecheck passed.
 
+- Resolved [03 UR reader](issues/03-ur-reader.md): bounded inbound single/multipart UR adapter; merge `846413a`, six tests, typecheck and browser-target bundle passed.
+
 ## Fog
 
 No outstanding product questions. API and wire details will be documented during implementation. The final code review compares against main (the pre-implementation baseline).

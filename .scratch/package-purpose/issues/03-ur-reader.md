@@ -1,7 +1,7 @@
 # 03: Existing UR input reader
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: None
 
 Spec: [Package purpose](../spec.md)
@@ -19,3 +19,7 @@ Use the tdd skill at the public round-trip seams already agreed in the spec. Wor
 - Created from the agreed purpose and goals; implementation details are delegated within this scope.
 
 - Claimed by the corresponding implementer on its isolated worktree.
+
+## Answer
+
+Implemented in `5b2c792`, integrated by merge `846413a`. Inbound UR reader unwraps single-part and multipart `ur:bytes` input, validates bounded metadata and payloads, and supports reordering, duplicates and reset. Integration validation: `bun test tests/ur.test.ts` passed 6 tests and 53 assertions; `bunx tsc --noEmit` passed; `bun build src/ur.ts --target browser --outdir /tmp/nut-fountain-ur-integration-build` passed. Actual browser execution remains ticket 04.
