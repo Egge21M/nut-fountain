@@ -1,7 +1,7 @@
 # 01: Versioned binary fountain core
 
 Type: task
-Status: ready-for-agent
+Status: claimed
 Blocked by: None
 
 Spec: [Package purpose](../spec.md)
@@ -17,3 +17,5 @@ Use the tdd skill at the public round-trip seams already agreed in the spec. Wor
 ## Comments
 
 - Created from the agreed purpose and goals; implementation details are delegated within this scope.
+
+- Claimed by the corresponding implementer on its isolated worktree.
