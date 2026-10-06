@@ -19,7 +19,7 @@ Verified the scoped changes in `67942c9` against `7d34c9b`. Both findings are re
 
 ## Spec
 
-Reviewed `main` (`5326c6c`) through frozen integration HEAD `7d34c9b` using `git diff main...HEAD`, against `.scratch/package-purpose/spec.md` and tickets 01–04.
+Reviewed `main` (`5326c6c`) through frozen integration HEAD `7d34c9b` using `git diff main...HEAD`, against the [historical package-purpose spec](https://github.com/Egge21M/nut-fountain/blob/55fe48b20627a19d3152a16d628f4fb98731a1f4/.scratch/package-purpose/spec.md) and tickets 01–04.
 
 - **P2 — Accepted Uint8Array subclasses can violate exact recovery through aliased buffers** (`src/core.ts:25`, `src/internal/core/wire.ts:39`). The spec requires: “The byte core reconstructs the exact original bytes.” The protocol additionally promises: “The constructor copies the input; changing it afterward does not change the encoded message.” Both code locations rely on the input's `.slice()` to copy. `Buffer` is an accepted `Uint8Array` subclass, but its `.slice()` returns a view. Confirmed: construct an encoder with `Buffer.from([1,2,3])`, mutate the original byte, then transmit its first frame; the receiver throws a reconstructed-message checksum error. Also confirmed: receive a Buffer-backed first source frame, mutate its payload afterward, then receive the second source frame; the stored equation changed and reconstruction fails. This affects browser Buffer implementations as well as Bun/Node. Copy into an owned plain Uint8Array explicitly at both boundaries and test encoder input isolation and decoder frame isolation through the public API.
 

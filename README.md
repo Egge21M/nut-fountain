@@ -2,6 +2,8 @@
 
 Experimental binary fountain transport for Cashu tokens, with a browser playground for device testing.
 
+The [version-1 protocol specification](packages/nut-fountain/docs/protocol.md) is the canonical wire-format definition for this project. It defines the `NF` magic, version `1`, and sequence-seeded fragment selection implemented by the library. Implementation guides, planning records, and external proposals do not define alternative wire formats.
+
 - [`packages/nut-fountain`](packages/nut-fountain): the TypeScript library, protocol documentation, and compatibility tests. Its package name and public exports are unchanged.
 - [`apps/playground`](apps/playground): a Vite + React app that sends and scans animated **raw binary** QR frames.
 

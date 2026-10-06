@@ -4,7 +4,7 @@ Type: task
 Status: resolved
 Blocked by: None
 
-Spec: [Package purpose](../spec.md)
+Historical spec: [Package purpose](https://github.com/Egge21M/nut-fountain/blob/55fe48b20627a19d3152a16d628f4fb98731a1f4/.scratch/package-purpose/spec.md)
 
 ## Scope and acceptance
 
