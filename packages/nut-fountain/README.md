@@ -79,6 +79,8 @@ const restored = decoder.result!; // Exact original bytes; a defensive copy.
 
 `nextFrame()` first emits source fragments, then repair frames. A receiver can accept reordering and duplicates and recover from lost source frames using repair frames. A real sender continues generating frames until the receiver completes or the application stops the transfer; there is no fixed completion bound under arbitrary loss. The example sends all source frames without loss.
 
+Binary transfers support up to 1024 source fragments, 1–4096 bytes per fragment, and a maximum message size of 1 MiB. The default 128-byte fragment size supports messages up to 128 KiB. Earlier version-1 readers reject transfers above 256 source fragments; see the [protocol bounds and compatibility notes](docs/protocol.md#2-version-1-bounds-and-fragmentation).
+
 `FountainDecoder.receive()` returns whether the frame added an independent equation, **not** whether decoding is complete. Malformed frames and frames belonging to another message throw. Use `isComplete` and `result` for completion, and `reset()` before another transfer. See the [protocol specification](docs/protocol.md) for wire bounds and checksums, and the [implementation guide](docs/implementation.md#decoder-state-progress-and-errors) for exact API and error behavior.
 
 ### Decoding progress

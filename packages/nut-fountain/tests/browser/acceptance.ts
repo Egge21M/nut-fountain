@@ -52,6 +52,16 @@ export function runAcceptance(fixtures: Fixtures): string[] {
   assert(reconstructed.length === bytes.length && reconstructed.every((value, i) => value === bytes[i]), 'exact byte recovery');
   passed.push('arbitrary bytes -> binary fountain -> exact bytes');
 
+  const largeBytes = Uint8Array.from({ length: 1024 * 128 - 7 }, (_, i) => (i * 13 + (i >>> 8)) & 255);
+  const largeEncoder = new FountainEncoder(largeBytes);
+  const largeReader = new FountainDecoder();
+  assert(largeEncoder.fragmentCount === 1024, 'maximum binary source fragment count');
+  for (let i = 0; i < largeEncoder.fragmentCount; i++) largeEncoder.nextFrame();
+  for (let i = 0; i < 2048 && !largeReader.isComplete; i++) largeReader.receive(largeEncoder.nextFrame());
+  const largeResult = largeReader.result;
+  assert(largeResult?.length === largeBytes.length && largeResult.every((value, i) => value === largeBytes[i]), '1024-fragment repair-only recovery');
+  passed.push('1024 source fragments -> repair-only binary fountain -> exact bytes');
+
   const expected: Token = {
     mint: 'https://mint.example', unit: 'sat', memo: 'Browser experiment',
     proofs: [{ amount: Amount.from(1), id: '009a1f293253e41e', secret: 'not-spendable', C: '02' + '11'.repeat(32) }],

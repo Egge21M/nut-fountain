@@ -22,7 +22,10 @@ export class FountainEncoder {
       throw new RangeError(`fragmentSize must be an integer from 1 to ${MAX_FRAGMENT_SIZE}`);
     }
     this.fragmentCount = Math.max(1, Math.ceil(message.length / this.fragmentSize));
-    if (message.length > MAX_MESSAGE_LENGTH || this.fragmentCount > MAX_FRAGMENTS) {
+    if (message.length > MAX_MESSAGE_LENGTH) {
+      throw new RangeError(`Message exceeds ${MAX_MESSAGE_LENGTH} bytes; use a smaller message`);
+    }
+    if (this.fragmentCount > MAX_FRAGMENTS) {
       throw new RangeError(`Message requires more than ${MAX_FRAGMENTS} fragments; use a larger fragmentSize or smaller message`);
     }
     this.message = new Uint8Array(message);

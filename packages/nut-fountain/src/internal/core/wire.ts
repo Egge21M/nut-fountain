@@ -1,8 +1,8 @@
 import { crc32 } from '../crc32.js';
 
 export const MAX_FRAGMENT_SIZE = 4096;
-export const MAX_FRAGMENTS = 256;
-export const MAX_MESSAGE_LENGTH = MAX_FRAGMENT_SIZE * MAX_FRAGMENTS;
+export const MAX_FRAGMENTS = 1024;
+export const MAX_MESSAGE_LENGTH = 1_048_576;
 const PREFIX = Uint8Array.of(0x4e, 0x46, 1, 0);
 const SEQUENCE_OFFSET = 4;
 const COUNT_OFFSET = 8;

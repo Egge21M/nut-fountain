@@ -26,16 +26,18 @@ Bytes are 8-bit unsigned values. All multibyte wire integers are unsigned and bi
 
 ## 2. Version-1 bounds and fragmentation
 
-This draft retains the existing version-1 interoperability bounds:
+This draft defines the following version-1 interoperability bounds:
 
 | Quantity | Allowed values |
 | --- | --- |
 | Fragment size S | 1 through 4096 bytes |
-| Source fragment count N | 1 through 256 |
+| Source fragment count N | 1 through 1024 |
 | Original message length L | 0 through 1,048,576 bytes |
 | Sequence number q | 1 through 4,294,967,295 (`0xffffffff`) |
 
 These are the supported bounds of this version-1 profile, not mathematical limits of fountain coding. The 32-bit count and length fields can represent larger values, but that does not make those values valid in this profile. Changing these bounds is a specification change, not merely a consequence of using a larger integer type. No default fragment size is prescribed.
+
+This revision raises the source fragment limit from 256 to 1024 while retaining the 1,048,576-byte message limit, version byte, frame layout, and selection algorithm. Transfers with at most 256 source fragments remain compatible with earlier version-1 readers. Earlier readers reject transfers with 257 through 1024 source fragments; both endpoints must support the revised bound to use those transfers. The frame format provides no capability negotiation.
 
 Given a message and selected fragment size, the sender must calculate:
 

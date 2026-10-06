@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { Buffer } from "buffer";
 import { FountainDecoder, FountainEncoder } from "../src/core.ts";
+import { serializeFrame } from "../src/internal/core/wire.ts";
 
 test("changing a Buffer input after encoder construction preserves the original message", () => {
   const input = Buffer.from([1, 2, 3]);
@@ -96,8 +97,8 @@ test("unsupported sizes and non-byte inputs fail before encoding", () => {
   for (const fragmentSize of [0, -1, 1.5, NaN, Infinity, 4097]) {
     expect(() => new FountainEncoder(Uint8Array.of(1), { fragmentSize })).toThrow();
   }
-  expect(() => new FountainEncoder(new Uint8Array(257), { fragmentSize: 1 })).toThrow();
-  expect(() => new FountainEncoder(new Uint8Array(1048577))).toThrow();
+  expect(() => new FountainEncoder(new Uint8Array(1025), { fragmentSize: 1 })).toThrow(/1024 fragments/);
+  expect(() => new FountainEncoder(new Uint8Array(1048577), { fragmentSize: 4096 })).toThrow(/1048576 bytes/);
   expect(() => new FountainEncoder([1, 2] as unknown as Uint8Array)).toThrow();
   expect(() => new FountainDecoder().receive([1, 2] as unknown as Uint8Array)).toThrow();
 });
@@ -129,13 +130,57 @@ test("reordered and duplicate frames recover bytes without exposing mutable stat
   expect(decoder.result).toEqual(original);
 });
 
-test("repair frames alone can reconstruct a message when all source frames are missed", () => {
-  const message = Uint8Array.from({ length: 256 }, (_, i) => i);
-  const encoder = new FountainEncoder(message, { fragmentSize: 1 });
+test.each([256, 1024])("repair frames alone recover %i source fragments", count => {
+  const message = Uint8Array.from({ length: count * 128 - 7 }, (_, i) => (i * 13 + (i >>> 8)) & 255);
+  const encoder = new FountainEncoder(message, { fragmentSize: 128 });
   const decoder = new FountainDecoder();
   for (let i = 0; i < encoder.fragmentCount; i++) encoder.nextFrame();
-  for (let i = 0; i < 512 && !decoder.isComplete; i++) decoder.receive(encoder.nextFrame());
+  for (let i = 0; i < count * 2 && !decoder.isComplete; i++) decoder.receive(encoder.nextFrame());
   expect(decoder.result).toEqual(message);
+});
+
+test.each([257, 1024])("recovers %i source fragments with loss, reordering and duplicates", count => {
+  const message = Uint8Array.from({ length: count * 128 - 7 }, (_, i) => (i * 13 + (i >>> 8)) & 255);
+  const encoder = new FountainEncoder(message, { fragmentSize: 128 });
+  expect(encoder.fragmentCount).toBe(count);
+  const frames = Array.from({ length: count }, () => encoder.nextFrame());
+  const decoder = new FountainDecoder();
+  for (let i = count - 1; i >= 0; i--) {
+    if (i % 3 === 0) continue;
+    decoder.receive(frames[i]!);
+  }
+  const rank = decoder.independentFrames;
+  expect(decoder.receive(frames[1]!)).toBe(false);
+  expect(decoder.independentFrames).toBe(rank);
+  expect(decoder.fragmentCount).toBe(count);
+  for (let i = 0; i < count * 2 && !decoder.isComplete; i++) decoder.receive(encoder.nextFrame());
+  expect(decoder.result).toEqual(message);
+  expect(decoder.progress).toBe(1);
+});
+
+test("the 1 MiB message limit is accepted with 1024 source fragments", () => {
+  const message = Uint8Array.from({ length: 1_048_576 }, (_, i) => (i * 13 + (i >>> 8)) & 255);
+  const encoder = new FountainEncoder(message, { fragmentSize: 1024 });
+  expect(encoder.fragmentCount).toBe(1024);
+  const decoder = new FountainDecoder();
+  for (let i = 0; i < encoder.fragmentCount; i++) decoder.receive(encoder.nextFrame());
+  expect(decoder.result).toEqual(message);
+});
+
+test("over-limit metadata with a valid frame CRC is rejected before establishing a transfer", () => {
+  // Each frame has a consistent count/length/size tuple and exceeds only one bound.
+  const frames = [
+    serializeFrame({ sequence: 1, count: 1025, length: 1025, checksum: 0, data: new Uint8Array(1) }),
+    serializeFrame({ sequence: 1, count: 257, length: 1_048_577, checksum: 0, data: new Uint8Array(4096) }),
+  ];
+  const decoder = new FountainDecoder();
+  for (const frame of frames) {
+    expect(() => decoder.receive(frame)).toThrow(/metadata/);
+    expect(decoder.fragmentCount).toBeUndefined();
+    expect(decoder.independentFrames).toBe(0);
+  }
+  decoder.receive(new FountainEncoder(Uint8Array.of(42)).nextFrame());
+  expect(decoder.result).toEqual(Uint8Array.of(42));
 });
 
 test("the public encoder and reader match an independently calculated version-1 wire vector", () => {

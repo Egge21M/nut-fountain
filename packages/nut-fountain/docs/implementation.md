@@ -63,7 +63,7 @@ The **fountain format version** describes the frame format and decoding rules. T
 1. Require a `Uint8Array` input.
 2. Choose `S`: the default is `128`; an explicit size must be an integer from `1` through `4096`.
 3. Calculate `N = max(1, ceil(L / S))`.
-4. Reject messages longer than `1,048,576` bytes or requiring more than `256` source fragments.
+4. Reject messages longer than `1,048,576` bytes or requiring more than `1024` source fragments.
 5. Copy the message and calculate its CRC32. Later changes to the caller's array cannot change the transfer.
 
 Conceptually, fragment `i` contains message bytes `[i*S, (i+1)*S)`, followed by zero bytes if necessary. The implementation does not allocate all padded source fragments ahead of time: it starts each output payload at zero and XORs the available source bytes into it.
@@ -224,7 +224,7 @@ The [mixed-frame vectors](protocol.md#mixed-frames-and-reordered-reception) cont
 1. Input is a `Uint8Array`.
 2. Total frame length is greater than 24 and at most 4120.
 3. The first four bytes are exactly `4e 46 01 00`.
-4. Metadata is valid: `q != 0`, `1 <= N <= 256`, `L <= 1,048,576`, and `N == max(1, ceil(L / S))`, where `S = frame.length - 24`.
+4. Metadata is valid: `q != 0`, `1 <= N <= 1024`, `L <= 1,048,576`, and `N == max(1, ceil(L / S))`, where `S = frame.length - 24`.
 5. The trailing frame CRC matches the preceding bytes.
 6. If a transfer is already established, `(N, L, S, messageCRC)` matches the active transfer's tuple.
 
@@ -387,7 +387,7 @@ The core can be imported without Cashu or UR dependencies. The library supports 
 
 ## Costs, limits, and transport responsibilities
 
-The 4096-byte fragment and 256-fragment limits are part of the [current version-1 profile](protocol.md#2-version-1-bounds-and-fragmentation) and are enforced by the library. They originated as resource bounds, but the wire fields' larger capacity does not extend the supported profile. The 128-byte default, allocation strategy, solver, and progress API are implementation choices. UR's separate limits are local compatibility-adapter limits and do not apply to the binary profile.
+The 4096-byte fragment, 1024-fragment, and independent 1,048,576-byte message limits are part of the [current version-1 profile](protocol.md#2-version-1-bounds-and-fragmentation) and are enforced by the library. They originated as resource bounds, but the wire fields' larger capacity does not extend the supported profile. Earlier version-1 readers enforce a 256-fragment limit and reject larger transfers. The 128-byte default, allocation strategy, solver, and progress API are implementation choices. UR's separate limits are local compatibility-adapter limits and do not apply to the binary profile.
 
 The library currently exposes the following settings and derived limits:
 
@@ -395,9 +395,9 @@ The library currently exposes the following settings and derived limits:
 | --- | --- |
 | Default fragment size | 128 bytes |
 | Allowed fragment size | 1–4096 bytes |
-| Source fragment count | 1–256 |
-| Largest message with default size | 32,768 bytes |
-| Largest message overall | 1,048,576 bytes, using 4096-byte fragments |
+| Source fragment count | 1–1024 |
+| Largest message with default size | 131,072 bytes |
+| Largest message overall | 1,048,576 bytes, using fragment sizes of 1024–4096 bytes |
 | Per-frame overhead | 24 bytes |
 | Last sequence | 4,294,967,295 |
 

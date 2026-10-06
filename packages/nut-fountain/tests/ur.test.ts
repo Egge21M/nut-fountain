@@ -20,7 +20,7 @@ describe('existing UR input', () => {
     expect(reader.result).toEqual(payload);
   });
 
-  test('supports UR transfers larger than the custom binary fragment-count limit', () => {
+  test('supports UR transfers with more than 256 source fragments', () => {
     const payload = Uint8Array.from({ length: 4096 }, (_, i) => i % 256);
     const reference = new UREncoder(UR.fromBuffer(Buffer.from(payload)), 10);
     expect(reference.fragmentsLength).toBeGreaterThan(256);
