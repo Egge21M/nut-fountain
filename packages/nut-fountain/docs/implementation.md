@@ -283,7 +283,7 @@ The core format itself does not require either CBOR or base64. It never tries to
 
 ## Inbound UR compatibility
 
-`UrDecoder` is a separate adapter with different framing and fragment selection. It shares the Gaussian solver, but our `NF` frames are not UR output. The package exposes no UR encoder; `@gandlaf21/bc-ur@1.1.12` is used only in development tests.
+`UrDecoder` is a separate adapter with different framing and fragment selection. It shares the Gaussian solver, but our `NF` frames are not UR output. The compatibility encoder is documented in the [library README](../README.md#compatibility-sending); `@gandlaf21/bc-ur@1.1.12` is used only in development tests.
 
 ### Accepted representation
 
@@ -435,3 +435,14 @@ bun run --cwd packages/nut-fountain test:browser
 The browser command requires Playwright's Chromium installation. See the [validation record](validation.md) for the broader project test setup. No finite test suite proves every input correct. Wire changes should update the specification and its independent vectors; API or solver changes should update this guide without redefining the wire format.
 
 Protocol background and attribution: [Cashu binary tokens](https://github.com/cashubtc/nuts/blob/main/00.md#binary-token), [NUT-16](https://github.com/cashubtc/nuts/blob/main/16.md), [UR multipart specification](https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2024-001-multipart-ur.md), and [third-party notices](../NOTICE.md). The behavior described above was checked against this repository's implementation and tests.
+
+## Alternating compatibility output
+
+The root and `nut-fountain/encoder` exports support binary, compatibility, and
+UR-only modes. They compose the unchanged binary core with UR encoding using the
+existing Bytewords dictionary and fragment chooser. Display slots alternate;
+protocol sequences do not skip. See [compatibility sending](../README.md#compatibility-sending)
+for options, limits, payload conventions, and mixed receiver semantics. The
+`nut-fountain/core` entry point remains binary-only. The automatic router's strict
+behavior described above is its default; `allowMixedFormats: true` opts into two
+independent decoders and freezes the first completed result until reset.

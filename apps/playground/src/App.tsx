@@ -2,7 +2,7 @@ import { TransferTiming, payloadKilobytesPerSecond } from './transferTiming';
 import { ScanReport } from './ScanReport';
 import type { FrameOutcome } from './scanDiagnostics';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FountainDecoder, FountainEncoder } from 'nut-fountain/core';
+import { FountainEncoder, type EncoderMode } from 'nut-fountain/encoder';
 import { bytesToToken, bytesToTokenString, tokenToBytes } from 'nut-fountain/cashu';
 import { drawFrame, readCanvas, readQrImage } from './qr';
 import { makeDemoToken } from './demo';
@@ -35,22 +35,23 @@ function TokenResult({ token, local = false, durationMs, payloadBytes }: { token
 function Sender({ token, setToken }: { token: string; setToken: (value: string) => void }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const encoder = useRef<FountainEncoder | null>(null);
-  const localReader = useRef<FountainDecoder | null>(null);
-  const original = useRef<Uint8Array | null>(null);
+  const localReader = useRef<AutoDecoder | null>(null);
+  const original = useRef<string>('');
+  const [encodingMode, setEncodingMode] = useState<EncoderMode>('binary');
   const [playing, setPlaying] = useState(false);
   const [fragmentSize, setFragmentSize] = useState(128);
   const [fps, setFps] = useState(5);
   const [sequence, setSequence] = useState(0);
   const [qrInfo, setQrInfo] = useState<{ version: number; modules: number }>();
-  const [info, setInfo] = useState({ bytes: 0, count: 0 });
+  const [info, setInfo] = useState({ bytes: 0, count: 0, urCount: 0 });
   const [error, setError] = useState('');
   const [decoded, setDecoded] = useState('');
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     setPlaying(false); encoder.current = null; localReader.current = null;
-    setSequence(0); setQrInfo(undefined); setInfo({ bytes: 0, count: 0 }); setDecoded(''); setError(''); setChecking(false);
-  }, [token, fragmentSize]);
+    setSequence(0); setQrInfo(undefined); setInfo({ bytes: 0, count: 0, urCount: 0 }); setDecoded(''); setError(''); setChecking(false);
+  }, [token, fragmentSize, encodingMode]);
 
   const next = useCallback(() => {
     if (!encoder.current || !canvas.current) return;
@@ -63,8 +64,8 @@ function Sender({ token, setToken }: { token: string; setToken: (value: string) 
         if (scanned) localReader.current.receive(scanned);
         if (localReader.current.isComplete) {
           const result = localReader.current.result!;
-          if (result.length !== original.current?.length || !result.every((byte, i) => byte === original.current![i])) {
-            throw new Error('The reconstructed bytes did not match the input.');
+          if (bytesToTokenString(result) !== original.current) {
+            throw new Error('The reconstructed token did not match the input.');
           }
           setDecoded(bytesToTokenString(result)); setPlaying(false); setChecking(false);
           localReader.current = null;
@@ -79,10 +80,13 @@ function Sender({ token, setToken }: { token: string; setToken: (value: string) 
   const prepare = (local: boolean, autoplay = true) => {
     try {
       const bytes = tokenToBytes(token.trim());
-      encoder.current = new FountainEncoder(bytes, { fragmentSize });
-      original.current = bytes;
-      localReader.current = local ? new FountainDecoder() : null;
-      setInfo({ bytes: bytes.length, count: encoder.current.fragmentCount });
+      encoder.current = new FountainEncoder(bytes, {
+        fragmentSize, mode: encodingMode, urFragmentSize: Math.min(fragmentSize, 1536),
+        urPayload: new TextEncoder().encode(token.trim()),
+      });
+      original.current = bytesToTokenString(bytes);
+      localReader.current = local ? new AutoDecoder({ allowMixedFormats: true }) : null;
+      setInfo({ bytes: bytes.length, count: encoder.current.fragmentCount, urCount: encoder.current.urFragmentCount ?? 0 });
       setSequence(0); setDecoded(''); setError(''); setChecking(local); setPlaying(autoplay);
       next();
     } catch (failure) {
@@ -114,6 +118,16 @@ function Sender({ token, setToken }: { token: string; setToken: (value: string) 
         <p className="field-note">{token === demo ? 'Synthetic demo · 12 proofs · not spendable' : 'Your token stays in this browser. Nothing is uploaded or saved.'}</p>
         <div className="divider" />
         <div className="section-heading"><span className="step">02</span><h2>Set the pace</h2></div>
+        <label htmlFor="encoding-mode">Encoding mode</label>
+        <select id="encoding-mode" disabled={playing} value={encodingMode}
+          onChange={event => setEncodingMode(event.target.value as EncoderMode)}>
+          <option value="binary">NF only</option>
+          <option value="compatibility">Compatibility · NF + UR alternating</option>
+          <option value="ur">UR only · legacy wallets</option>
+        </select>
+        <p className="field-note">{encodingMode === 'compatibility'
+          ? 'Odd display frames carry NF, even frames carry UR. Each format gets half the frame rate. Older wallets must ignore NF frames.'
+          : encodingMode === 'ur' ? 'UR carries the cashuB token as text for legacy wallet testing.' : 'Send the new binary fountain format.'}</p>
         <div className="field-grid">
           <div><label htmlFor="fragment">Bytes per fragment</label><select id="fragment" disabled={playing} value={fragmentSize}
             onChange={event => setFragmentSize(Number(event.target.value))}>
@@ -125,16 +139,17 @@ function Sender({ token, setToken }: { token: string; setToken: (value: string) 
             <input id="fps" type="range" min="2" max="60" value={fps} onChange={event => setFps(Number(event.target.value))} />
             <div className="range-labels"><span>Slower</span><span>Faster</span></div></div>
         </div>
-        <p className="field-note">Larger fragments put more data in each QR. Fragments larger than the token are padded, so you can still test the full density.</p>
+        <p className="field-note">Larger fragments put more data in each QR. NF fragments larger than the token are padded, so you can still test the full density.</p>
+        {encodingMode !== 'binary' && <p className="field-note">UR fragments use up to {Math.min(fragmentSize, 1536)} bytes before text encoding, keeping them within QR capacity.</p>}
         <div className="actions"><button className="button secondary" disabled={playing} onClick={() => encoder.current ? next() : prepare(false, false)}>Next frame →</button></div>
         <button className="local-test" disabled={playing} onClick={() => prepare(true)}>↻ Run local QR test <span>No second device needed</span></button>
         {error && <p className="message error" role="alert">{error}</p>}
       </section>
       <section className="panel transmission" aria-label="QR transmitter">
         <div className="transmission-heading"><span className={'badge ' + (playing ? 'live' : '')}>
-          <i />{checking && playing ? 'Checking locally' : playing ? 'Sending' : sequence ? 'Paused' : 'Ready to send'}</span><span className="micro">BINARY QR</span></div>
+          <i />{checking && playing ? 'Checking locally' : playing ? 'Sending' : sequence ? 'Paused' : 'Ready to send'}</span><span className="micro">{encodingMode === 'compatibility' ? 'NF + UR' : encodingMode === 'ur' ? 'UR QR' : 'BINARY QR'}</span></div>
         <div className="qr-stage">
-          <canvas ref={canvas} hidden={!sequence} aria-label="Binary fountain QR code" role="img" />
+          <canvas ref={canvas} hidden={!sequence} aria-label="Fountain QR code" role="img" />
           {!sequence && <div className="qr-placeholder"><div className="qr-mark">▦</div><h3>Your transfer starts here</h3><p>Start sending to display<br />animated QR frames.</p></div>}
         </div>
         {qrInfo && <p className="field-note" aria-label="QR density">QR v{qrInfo.version} · {qrInfo.modules} × {qrInfo.modules} modules · error correction M</p>}
@@ -142,7 +157,7 @@ function Sender({ token, setToken }: { token: string; setToken: (value: string) 
         <button className="button primary playback" onClick={toggle}>
           {playing ? 'Ⅱ Pause' : sequence ? '▶ Resume sending' : '▶ Start sending'}</button>
         <div className="stats"><div><strong>{sequence || '—'}</strong><span>Frames sent</span></div>
-          <div><strong>{info.count || '—'}</strong><span>Source fragments</span></div>
+          <div><strong>{info.count || '—'}{encodingMode === 'compatibility' && info.urCount ? ` / ${info.urCount}` : ''}</strong><span>{encodingMode === 'compatibility' ? 'NF / UR fragments' : 'Source fragments'}</span></div>
           <div><strong>{info.bytes ? info.bytes.toLocaleString() : '—'}</strong><span>Token bytes</span></div></div>
       </section>
     </div>
@@ -152,7 +167,7 @@ function Sender({ token, setToken }: { token: string; setToken: (value: string) 
 }
 
 function Receiver() {
-  const reader = useRef(new AutoDecoder());
+  const reader = useRef(new AutoDecoder({ allowMixedFormats: true }));
   const timing = useRef(new TransferTiming());
   const [transferDurationMs, setTransferDurationMs] = useState<number>();
   const importSession = useRef(0);
@@ -164,7 +179,7 @@ function Receiver() {
   useEffect(() => () => { importSession.current++; }, []);
   const accept = (bytes: Uint8Array): FrameOutcome => {
     const receivedAt = performance.now();
-    const before = reader.current.independentFrames;
+    const before = reader.current.totalIndependentFrames;
     let accepted = false;
     let decoderError = false;
     let tokenValid: boolean | undefined;
@@ -189,7 +204,7 @@ function Receiver() {
     else timing.current.record(receivedAt, performance.now(), accepted, reader.current.isComplete);
     setTransferDurationMs(timing.current.durationMs);
     setProgress({ value: reader.current.progress, useful: reader.current.independentFrames, total: reader.current.fragmentCount });
-    return { complete: reader.current.isComplete, useful: Math.max(0, reader.current.independentFrames - before),
+    return { complete: reader.current.isComplete, useful: Math.max(0, reader.current.totalIndependentFrames - before),
       rank: reader.current.independentFrames, fragmentCount: reader.current.fragmentCount,
       format: reader.current.format, decoderError, tokenValid, firstValidFrameToCompleteMs: timing.current.durationMs, payloadBytes: reader.current.result?.byteLength };
   };
@@ -266,7 +281,7 @@ function Receiver() {
     </div>
     {decoded && <TokenResult token={decoded} durationMs={transferDurationMs} payloadBytes={reader.current.result?.byteLength} />}
     {camera.report && <ScanReport key={camera.report.startedAt} report={camera.report} />}
-    <div className="tip"><span>↳</span><p>The reader automatically recognizes nut-fountain binary frames and ur:bytes containing cashuB text or a binary Cashu V4 token. Sending from this demo uses the new binary format.</p></div>
+    <div className="tip"><span>↳</span><p>The reader automatically recognizes nut-fountain binary frames and ur:bytes containing cashuB text or a binary Cashu V4 token. Compatibility mode sends both formats; the reader keeps separate progress and uses the first completed reconstruction.</p></div>
   </>;
 }
 

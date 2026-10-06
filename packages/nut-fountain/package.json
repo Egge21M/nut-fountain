@@ -14,7 +14,7 @@
     "@noble/hashes": "2.4.0"
   },
   "version": "0.1.0",
-  "description": "Experimental browser-compatible binary fountain transport with Cashu and inbound UR helpers",
+  "description": "Experimental browser-compatible binary fountain transport with Cashu and UR compatibility helpers",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -25,6 +25,10 @@
     "./core": {
       "types": "./dist/core.d.ts",
       "import": "./dist/core.js"
+    },
+    "./encoder": {
+      "types": "./dist/encoder.d.ts",
+      "import": "./dist/encoder.js"
     },
     "./cashu": {
       "types": "./dist/cashu.d.ts",

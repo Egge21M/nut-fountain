@@ -44,12 +44,13 @@ const vectors = await Bun.file(join(packageRoot, 'tests/fixtures/urkit.json')).j
 await Bun.write(join(consumer, 'consumer.ts'), `
 import * as api from 'nut-fountain';
 import { FountainEncoder, FountainDecoder } from 'nut-fountain/core';
+import { FountainEncoder as CompatibleEncoder } from 'nut-fountain/encoder';
 import { tokenToBytes, bytesToToken, bytesToTokenString, type Token } from 'nut-fountain/cashu';
 import { UrDecoder } from 'nut-fountain/ur';
 import { AutoDecoder } from 'nut-fountain/auto';
 import { encodeCbor, decodeCbor, encodeBase64Url, decodeBase64Url } from 'nut-fountain/encoding';
 function check(value: boolean, message: string) { if (!value) throw new Error(message); }
-check(api.FountainEncoder === FountainEncoder && api.AutoDecoder === AutoDecoder, 'root exports');
+check(api.FountainEncoder === CompatibleEncoder && api.AutoDecoder === AutoDecoder, 'root exports');
 const message = Uint8Array.from({ length: 1000 }, (_, i) => i % 256);
 const encoder = new FountainEncoder(message, { fragmentSize: 100 });
 const strict = new FountainDecoder(), auto = new AutoDecoder();
@@ -70,7 +71,11 @@ auto.reset(); auto.receive(${JSON.stringify(vectors.single)});
 check(ur.isComplete && auto.isComplete, 'UR routing');
 check(Array.from(ur.result!, b => b.toString(16).padStart(2, '0')).join('') === ${JSON.stringify(vectors.singlePayloadHex)}, 'UR payload');
 if (typeof window !== 'undefined') check(!('Buffer' in globalThis) && !('process' in globalThis), 'no Node polyfills');
-console.log('All six package entry points pass');
+const mixed = new CompatibleEncoder(message, { mode: 'compatibility', fragmentSize: 100 });
+const mixedReader = new AutoDecoder({ allowMixedFormats: true });
+for (let i = 0; i < 100 && !mixedReader.isComplete; i++) mixedReader.receive(mixed.nextFrame());
+check(mixedReader.result?.length === message.length, 'compatibility encoding');
+console.log('All seven package entry points pass');
 `);
 const tsc = join(checkout, 'node_modules/typescript/bin/tsc');
 const flags = ['--strict', '--skipLibCheck', 'false', '--target', 'ES2022', '--lib', 'ES2022,DOM'];

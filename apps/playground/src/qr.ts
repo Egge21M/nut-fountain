@@ -3,7 +3,11 @@ import { readQrPixels } from './qrDecode';
 export { readQrPixels } from './qrDecode';
 
 export function createFrameQr(frame: Uint8Array) {
-  return QRCode.create([{ mode: 'byte', data: frame }], { errorCorrectionLevel: 'M' });
+  // Uppercase UR uses QR's alphanumeric alphabet; NF must stay raw binary.
+  const isUr = frame[0] === 0x55 && frame[1] === 0x52 && frame[2] === 0x3a;
+  return QRCode.create(isUr
+    ? [{ mode: 'alphanumeric', data: new TextDecoder().decode(frame) }]
+    : [{ mode: 'byte', data: frame }], { errorCorrectionLevel: 'M' });
 }
 
 export function drawFrame(canvas: HTMLCanvasElement, frame: Uint8Array): { version: number; modules: number } {

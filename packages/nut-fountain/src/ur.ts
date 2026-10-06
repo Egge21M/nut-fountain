@@ -18,7 +18,7 @@ const isUint32 = (value: unknown): value is number =>
  *
  * Bounds: 1 MiB wrapped message, 1024 source fragments, 131072 characters per
  * input, 8192 distinct parts and 16 MiB cumulative fragment input per session.
- * Reset to abandon a session or after reaching a bound. No UR encoder is exposed.
+ * Reset to abandon a session or after reaching a bound.
  */
 export class UrDecoder {
   #solver: FountainSolver | undefined;

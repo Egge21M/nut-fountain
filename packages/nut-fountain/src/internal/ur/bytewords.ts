@@ -6,6 +6,14 @@ const words = 'ableacidalsoapexaquaarchatomauntawayaxisbackbaldbarnbeltbetabiasb
 const values = new Map<string, number>();
 for (let i = 0; i < 256; i++) values.set(words[i * 4]! + words[i * 4 + 3]!, i);
 
+/** Encode minimal Bytewords, including its big-endian CRC-32 suffix. */
+export function encodeBytewords(body: Uint8Array): string {
+  const bytes = new Uint8Array(body.length + 4);
+  bytes.set(body);
+  new DataView(bytes.buffer).setUint32(body.length, crc32(body));
+  return Array.from(bytes, byte => words[byte * 4]! + words[byte * 4 + 3]!).join('');
+}
+
 /** Decode minimal Bytewords and verify its big-endian CRC-32 suffix. */
 export function decodeBytewords(text: string): Uint8Array {
   if (text.length < 10 || text.length % 2 !== 0) throw new Error('Invalid Bytewords length');

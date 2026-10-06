@@ -36,6 +36,33 @@ try {
   assert.equal(await page.getByLabel('Decoded Cashu token').inputValue(), token);
   passed.push('Token → rendered binary QR pixels → token');
 
+  for (const mode of ['compatibility', 'ur']) {
+    await page.locator('#encoding-mode').selectOption(mode);
+    await page.getByRole('button', { name: /Run local QR test/ }).click();
+    await page.getByRole('heading', { name: 'Local QR round trip passed' }).waitFor({ timeout: 30000 });
+    assert.equal(await page.getByLabel('Decoded Cashu token').inputValue(), token);
+    passed.push(`${mode} sender completes a local QR round trip`);
+  }
+  await page.locator('#encoding-mode').selectOption('binary');
+
+  // Capture the actual alternating sender. Start importing on UR to exercise
+  // joining at either parity, then verify legacy readers' UR-only view as well.
+  await page.locator('#encoding-mode').selectOption('compatibility');
+  const mixedFrames: string[] = [];
+  for (let i = 0; i < 48; i++) {
+    await page.getByRole('button', { name: /Next frame/ }).click();
+    mixedFrames.push(await page.locator('canvas').evaluate(canvas => (canvas as HTMLCanvasElement).toDataURL('image/png')));
+  }
+  for (const images of [mixedFrames.slice(1), mixedFrames.filter((_, i) => i % 2 === 1)]) {
+    await receive(page);
+    await page.getByLabel('Import QR images').setInputFiles(imageFiles(images));
+    await page.getByRole('heading', { name: 'Token received' }).waitFor();
+    assert.equal(await page.getByLabel('Decoded Cashu token').inputValue(), token);
+    assert.equal(await page.getByRole('alert').count(), 0);
+  }
+  passed.push('Actual alternating sender images decode from UR-first mixed input and UR-only input');
+  await page.goto(server.url.href);
+
   await page.locator('#token').fill('cashuAinvalid');
   await page.getByRole('button', { name: /Start sending/ }).click();
   await page.getByRole('alert').waitFor();

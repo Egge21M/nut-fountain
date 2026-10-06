@@ -1,6 +1,6 @@
 # nut-fountain
 
-An experimental, browser-compatible TypeScript package for developing a binary fountain transport specification. It encodes arbitrary bytes into versioned binary fountain frames, reconstructs those bytes, and provides Cashu V4 helpers and an inbound UR reader. APIs and wire compatibility may change before version 1.0.
+An experimental, browser-compatible TypeScript package for developing a binary fountain transport specification. It encodes arbitrary bytes into versioned binary fountain frames, reconstructs those bytes, and provides Cashu V4 helpers and UR compatibility encoding and decoding. APIs and wire compatibility may change before version 1.0.
 
 QR rendering and camera scanning live in the separate [device playground](https://github.com/Egge21M/nut-fountain/tree/main/apps/playground), outside this library. Wallet integration and comparative performance claims are outside this implementation. Its new dense GF(2) fountain protocol differs from the earlier POC; that POC's efficiency measurements do not establish this protocol's performance.
 
@@ -125,6 +125,56 @@ const cashuB = bytesToTokenString(decoder.result!);
 
 `tokenToBytes` returns `crawB` binary bytes. Text conversion preserves the original CBOR and produces unpadded base64url text. Object input uses the public `Token` shape in pinned `@cashu/cashu-ts@4.11.0`, including `Amount` values. Object conversions promise equivalent contents rather than identical serialization: cashu-ts defaults missing units to `sat` and normalizes witness metadata to JSON strings. Full keyset IDs from objects are preserved; already shortened IDs in input cannot be expanded without additional information. Helpers do not contact a mint or validate whether proofs are spendable. `cashuA` is unsupported.
 
+## Compatibility sending
+
+The root `FountainEncoder` (also exported from `nut-fountain/encoder`) keeps binary
+output as its default and accepts `mode: 'compatibility'` or `mode: 'ur'`.
+`nut-fountain/core` retains the binary-only encoder without UR dependencies.
+
+```ts
+import { FountainEncoder } from 'nut-fountain/encoder';
+import { tokenToBytes } from 'nut-fountain/cashu';
+
+const encoder = new FountainEncoder(tokenToBytes(token), {
+  mode: 'compatibility',
+  fragmentSize: 128,
+  urPayload: new TextEncoder().encode(token), // cashuB text for legacy wallets
+});
+const frame = encoder.nextFrame(); // Uint8Array: NF bytes or uppercase ASCII UR
+```
+
+Compatibility output is `NF₁, UR₁, NF₂, UR₂, …`, with independent consecutive
+sequence numbers. Each stream carries the complete message and gets half the
+display slots. `urPayload` defaults to the original message; callers may supply
+another serialization of the same token. Both inputs are copied. UR wraps its
+payload in a CBOR byte string and emits minimal Bytewords. Single-part UR repeats
+the complete code. Multipart output continues with repair frames after the source
+fragments. UR output is checked against the development-only reference library;
+no Node polyfill or additional runtime dependency is required.
+
+`urFragmentSize` defaults to `fragmentSize` (128 by default). It specifies the
+maximum fragment bytes before CBOR and text overhead; actual UR fragments are
+balanced across the message. Both fragment-size options allow 1–4096 bytes.
+UR limits are 1024 fragments and 1 MiB **including** the CBOR message wrapper;
+settings that exceed these limits throw at construction. QR capacity must be
+checked separately. `fragmentCount` reports NF fragments in compatibility mode,
+and UR fragments in UR-only mode; `urFragmentCount` exposes the UR count whenever
+UR is enabled. The root encoder and core encoder are different classes.
+
+For mixed input use `new AutoDecoder({ allowMixedFormats: true })`. It retains
+independent reconstruction state for each format. `format`, `progress`,
+`independentFrames`, and `fragmentCount` describe the reconstruction with the
+highest fractional progress (ties retain insertion order). The first completed,
+transport-validated reconstruction wins; later frames return `false` until reset.
+`totalIndependentFrames` sums retained rank across both formats for scan metrics.
+Cashu validation is still the caller's responsibility. The receiver does not
+verify that the two streams encode the same token; only scan one sender at a time.
+The default `AutoDecoder` continues to reject a change of format until reset.
+
+Older wallets must ignore NF frames without resetting their UR decoder. This
+behavior requires device testing; reference-library compatibility alone does not
+guarantee wallet compatibility.
+
 ## Existing UR input
 
 ```ts
@@ -146,7 +196,7 @@ export function readUrParts(parts: Iterable<string>) {
 }
 ```
 
-The supported convention is `ur:bytes` carrying a CBOR byte string whose payload is either UTF-8 `cashuB` text or `crawB` binary. Single-part and multipart inputs, including uppercase strings, are accepted. `UrDecoder` removes UR/Bytewords/CBOR framing and returns payload bytes; the Cashu helpers interpret either payload representation. The package does not encode UR. Its local decoder uses native `BigInt` and `Uint8Array`, with `cborg` for CBOR and `@noble/hashes` for SHA-256. `@gandlaf21/bc-ur` is development-only and generates interoperability fixtures; it is not in the runtime import graph. See [third-party notices](NOTICE.md) for protocol material and fixture attribution.
+The supported convention is `ur:bytes` carrying a CBOR byte string whose payload is either UTF-8 `cashuB` text or `crawB` binary. Single-part and multipart inputs, including uppercase strings, are accepted. `UrDecoder` removes UR/Bytewords/CBOR framing and returns payload bytes; the Cashu helpers interpret either payload representation. Use `FountainEncoder` from `nut-fountain/encoder` for UR-only or alternating output. Its local decoder uses native `BigInt` and `Uint8Array`, with `cborg` for CBOR and `@noble/hashes` for SHA-256. `@gandlaf21/bc-ur` is development-only and generates interoperability fixtures; it is not in the runtime import graph. See [third-party notices](NOTICE.md) for protocol material and fixture attribution.
 
 `UrDecoder.receive()` returns whether a new part was accepted; it returns `false` for malformed, duplicate, foreign, over-limit, or post-completion input. It does **not** indicate completion. Use `isComplete`, `result`, and `reset()` as with the binary reader. A failed reconstructed UR message resets the session; a successfully reconstructed non-Cashu byte payload is rejected by the Cashu helper. [NUT-16](https://github.com/cashubtc/nuts/blob/main/16.md) does not fix the exact UR payload mapping, so these conventions do not establish compatibility with every wallet.
 
@@ -154,12 +204,13 @@ The supported convention is `ur:bytes` carrying a CBOR byte string whose payload
 
 | Import | Exports |
 | --- | --- |
-| `nut-fountain/core` | `FountainEncoder`, `FountainDecoder` |
+| `nut-fountain/encoder` | `FountainEncoder`, type `EncoderMode`, type `EncoderOptions` |
+| `nut-fountain/core` | Binary-only `FountainEncoder`, `FountainDecoder` |
 | `nut-fountain/cashu` | `tokenToBytes`, `bytesToToken`, `bytesToTokenString`, type `Token` |
 | `nut-fountain/ur` | `UrDecoder` |
 | `nut-fountain/auto` | `AutoDecoder`, type `DecoderFormat` |
 | `nut-fountain/encoding` | `encodeCbor`, `decodeCbor`, `encodeBase64Url`, `decodeBase64Url` |
-| `nut-fountain` | All of the above |
+| `nut-fountain` | All of the above, with the mode-aware `FountainEncoder` |
 
 CBOR helpers encode CBOR-compatible values and decode exactly one item. Base64 helpers use the URL-safe alphabet; encoding omits padding and decoding accepts valid padded or unpadded input. Invalid input throws.
 

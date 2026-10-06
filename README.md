@@ -43,7 +43,23 @@ PLAYGROUND_ALLOWED_HOSTS=your-development-host.example bun run dev
 
 You can also use **Next frame** on the sender and import screenshots with **Import QR images** on the receiver. Image import does not require camera permission or HTTPS.
 
-Tokens are processed locally, without uploads, storage, or mint calls. The app reads the scanner's binary data directly; it does not encode fountain frames as base64, UTF-8 text, or UR. The device reader also automatically accepts single-part and animated `ur:bytes` QR codes carrying UTF-8 `cashuB` strings or `crawB` binary tokens. Camera scanning and image import use the package’s public `AutoDecoder`, with progress for both formats. Applications can instead select the scoped `FountainDecoder` or `UrDecoder`. Reset the reader before switching transfers. Sending still uses only the new binary format.
+Tokens are processed locally, without uploads, storage, or mint calls. The app reads the scanner's binary data directly. NF frames stay raw binary; UR frames use uppercase text and alphanumeric QR encoding. The device reader also automatically accepts single-part and animated `ur:bytes` QR codes carrying UTF-8 `cashuB` strings or `crawB` binary tokens. Camera scanning and image import use the package’s public `AutoDecoder` with `allowMixedFormats: true`, with progress for both formats. Applications can instead select the scoped `FountainDecoder` or `UrDecoder`. Reset the reader before switching transfers. Sending offers NF only, alternating NF + UR compatibility, and UR only. The playground enables mixed-format reception, retaining separate state and accepting the first completed reconstruction.
+
+## Test compatibility mode
+
+On **Send**, choose **Compatibility · NF + UR alternating** under **Encoding mode**.
+Odd display frames carry NF; even frames carry UR with UTF-8 `cashuB` payloads.
+The selected FPS is the total display rate, so each format receives half of it.
+Each format has independent sequence numbers and can reconstruct the whole token.
+UR fragments are capped at 1,536 bytes before text encoding so they fit QR at
+error correction M; the sender shows both source fragment counts.
+
+Test with this playground's receiver and with unmodified older wallets. Start
+scanning on either format and confirm that NF frames do not reset or interrupt a
+legacy wallet's UR scan. **UR only · legacy wallets** provides a fallback and a
+comparison for timing. **Run local QR test** works in all three modes. Automated
+reference-library and browser tests do not establish compatibility with every
+wallet or camera; strict alternation can interact with camera sampling timing.
 
 ## Measure phone scanning speed
 

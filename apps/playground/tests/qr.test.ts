@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { FountainEncoder as CompatibleEncoder } from 'nut-fountain/encoder';
 import { FountainEncoder, FountainDecoder } from 'nut-fountain/core';
 import { createFrameQr, readQrPixels } from '../src/qr';
 import QRCode from 'qrcode';
@@ -87,4 +88,33 @@ test('scanner preserves binary bytes and keeps active formats separate until res
   reader.receive(ur);
   expect(reader.format).toBe('ur');
   expect(bytesToTokenString(reader.result!)).toBe(token);
+});
+
+for (const winner of ['binary', 'ur'] as const) {
+  test(`compatibility QR pixels support ${winner}-only receivers`, () => {
+    const sender = new CompatibleEncoder(tokenToBytes(token), {
+      mode: 'compatibility', fragmentSize: 80, urPayload: new TextEncoder().encode(token),
+    });
+    const reader = new AutoDecoder();
+    for (let i = 0; i < 200 && !reader.isComplete; i++) {
+      const frame = sender.nextFrame();
+      if ((i % 2 === 0) !== (winner === 'binary')) continue;
+      const qr = createFrameQr(frame);
+      expect(qr.segments[0]!.mode.id).toBe(winner === 'binary' ? 'Byte' : 'Alphanumeric');
+      reader.receive(scan(qr));
+    }
+    expect(bytesToTokenString(reader.result!)).toBe(token);
+  });
+}
+
+test('maximum playground compatibility fragments fit both QR formats', () => {
+  const sender = new CompatibleEncoder(new Uint8Array(10000), {
+    mode: 'compatibility', fragmentSize: 2307, urFragmentSize: 1536,
+  });
+  for (let i = 0; i < 40; i++) {
+    const frame = sender.nextFrame();
+    const qr = createFrameQr(frame);
+    expect(qr.version).toBeLessThanOrEqual(40);
+    if (i < 2) expect(scan(qr)).toEqual(frame);
+  }
 });
