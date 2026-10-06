@@ -13,7 +13,7 @@
     "cborg": "4.3.2",
     "@noble/hashes": "2.4.0"
   },
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-alpha.1",
   "description": "Experimental browser-compatible binary fountain transport with Cashu and inbound UR helpers",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
