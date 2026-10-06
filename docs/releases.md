@@ -1,6 +1,6 @@
 # Publishing releases
 
-Publishing a GitHub release triggers [publish.yml](../.github/workflows/publish.yml). The workflow checks out that release's tag, verifies that it matches `packages/nut-fountain/package.json`, runs type checks and tests, and verifies a clean-checkout tarball in isolated Node, TypeScript and Chromium consumers. A separate job checks the tarball's SHA-512 integrity and publishes that exact artifact to npm using OIDC and provenance. No npm token secret is used.
+Publishing a stable GitHub release triggers [publish.yml](../.github/workflows/publish.yml). The workflow checks out that release's tag, checks that the package has a stable `X.Y.Z` version matching the tag, runs type checks and tests, and verifies a clean-checkout tarball in isolated Node, TypeScript and Chromium consumers. A separate job checks the tarball's SHA-512 integrity and publishes that exact artifact to npm under `latest` using OIDC and provenance. No npm token secret is used.
 
 ## One-time npm configuration
 
@@ -18,21 +18,11 @@ The workflow filename is case-sensitive and excludes `.github/workflows/`. The w
 
 ## Release process
 
-1. Update the package version and its workspace entry in `bun.lock`, commit, and push.
-2. Create and push an annotated tag named `v<package version>`, such as `v0.1.0-alpha.2`. The tagged commit must include the publishing workflow for automatic release-event publishing.
-3. Create a GitHub release for that tag and publish it. Mark alpha, beta and rc versions as prereleases; mark stable versions as ordinary releases.
+1. Update the package to a stable `X.Y.Z` version and update its workspace entry in `bun.lock`, commit, and push.
+2. Create and push an annotated tag named `v<package version>`, such as `v0.1.0`. The tagged commit must include the publishing workflow.
+3. Create a GitHub release for that tag and publish it as an ordinary release, with the prerelease option unchecked.
 4. Check the **Publish npm package** workflow result and the version on npm.
 
-Creating a draft release or pushing a tag alone does not publish the package. The workflow listens to `release.published`, which covers both stable releases and prereleases, including publication from drafts. See [GitHub's release event documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#release).
+Creating a draft release or pushing a tag alone does not publish the package. The workflow listens to `release.published` and skips prereleases. See [GitHub's release event documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#release).
 
-Versions `X.Y.Z-alpha.N`, `X.Y.Z-beta.N` and `X.Y.Z-rc.N` publish under the npm dist-tags `alpha`, `beta` and `rc`, respectively. Stable `X.Y.Z` versions publish under `latest`. The GitHub release's prerelease setting must agree with the version. An already published npm version cannot be overwritten; use a new package version for new contents.
-
-## Manual verification and recovery
-
-The workflow also has a **Run workflow** action on `main`:
-
-- Set **tag** to an existing version tag.
-- Leave **publish** disabled to run all verification and upload the checked tarball without publishing. This does not require an npm login or a GitHub release.
-- Enable **publish** only when a published GitHub release already exists for that tag. The same version, release and artifact checks run before publishing through OIDC.
-
-The existing `v0.1.0-alpha.1` tag predates this workflow. After registering the trusted publisher, create its GitHub prerelease and use the manual action on `main` with that tag and **publish** enabled. This publishes the original tagged source without moving the tag. Subsequent tags containing the workflow publish automatically when their GitHub releases are published.
+Only stable `X.Y.Z` package versions are supported; alpha, beta and rc packages cannot be published by this workflow. An already published npm version cannot be overwritten; use a new package version for new contents.

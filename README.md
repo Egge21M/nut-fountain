@@ -78,7 +78,7 @@ See the [protocol specification](packages/nut-fountain/docs/protocol.md) for lan
 
 ## npm releases
 
-Publishing a GitHub release runs the trusted-publishing workflow. See [release setup and instructions](docs/releases.md) for the one-time npm configuration, version tags, and verification-only runs.
+Publishing a stable GitHub release runs the trusted-publishing workflow and publishes to npm under `latest`. See [release setup and instructions](docs/releases.md) for the one-time npm configuration and release process.
 
 ## Fly.io deployment
 
