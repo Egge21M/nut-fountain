@@ -76,6 +76,10 @@ Production assets are in `apps/playground/dist`; library artifacts are in `packa
 
 See the [protocol specification](packages/nut-fountain/docs/protocol.md) for language-neutral wire rules, the [implementation guide](packages/nut-fountain/docs/implementation.md) for the solver and package behavior, and the [library README](packages/nut-fountain/README.md) for API examples.
 
+## npm releases
+
+Publishing a GitHub release runs the trusted-publishing workflow. See [release setup and instructions](docs/releases.md) for the one-time npm configuration, version tags, and verification-only runs.
+
 ## Fly.io deployment
 
 The playground is deployed at https://nut-fountain.fly.dev in the `personal` organization.

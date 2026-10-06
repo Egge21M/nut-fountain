@@ -1,0 +1,157 @@
+name: Publish npm package
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to verify or publish (for example v0.1.0-alpha.1)
+        required: true
+        type: string
+      publish:
+        description: Publish to npm after verification (requires a published GitHub release)
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      channel: ${{ steps.metadata.outputs.channel }}
+      integrity: ${{ steps.package.outputs.integrity }}
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      SHOULD_PUBLISH: ${{ github.event_name == 'release' || inputs.publish == true }}
+    steps:
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Validate release tag
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          assert.match(process.env.RELEASE_TAG, /^v\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)\.\d+)?$/);
+          JS
+
+      - name: Require a published GitHub release before publishing
+        if: env.SHOULD_PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > "$RUNNER_TEMP/release.json"
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const release = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/release.json`, 'utf8'));
+          assert.equal(release.tag_name, process.env.RELEASE_TAG);
+          assert.equal(release.draft, false);
+          assert.ok(release.published_at);
+          assert.equal(release.prerelease, process.env.RELEASE_TAG.includes('-'), 'Mark alpha/beta/rc releases as prereleases');
+          JS
+
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.3.14'
+
+      - name: Match the tag to the package version
+        id: metadata
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { appendFileSync, readFileSync } from 'node:fs';
+          const pkg = JSON.parse(readFileSync('packages/nut-fountain/package.json', 'utf8'));
+          assert.equal(pkg.name, 'nut-fountain');
+          assert.equal(process.env.RELEASE_TAG, `v${pkg.version}`);
+          const channel = pkg.version.split('-')[1]?.split('.')[0] ?? 'latest';
+          appendFileSync(process.env.GITHUB_OUTPUT, `channel=${channel}\n`);
+          JS
+
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun run test
+      - run: bun x playwright install --with-deps chromium
+      - run: bun run --cwd packages/nut-fountain test:browser
+
+      - name: Verify a clean-checkout tarball in isolated consumers
+        id: package
+        run: |
+          bun run --cwd packages/nut-fountain test:package > "$RUNNER_TEMP/package-check.json"
+          cat "$RUNNER_TEMP/package-check.json"
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          import { appendFileSync, readFileSync } from 'node:fs';
+          const result = JSON.parse(readFileSync(`${process.env.RUNNER_TEMP}/package-check.json`, 'utf8'));
+          assert.equal(result.commit, execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim());
+          for (const check of ['cleanCheckoutPrepack', 'productionOnlyInstall', 'nodeRuntime', 'chromium']) {
+            assert.equal(result[check], true, check);
+          }
+          assert.ok(result.tarball.endsWith('.tgz'));
+          assert.match(result.integrity, /^sha512-[A-Za-z0-9+/]+=*$/);
+          appendFileSync(process.env.GITHUB_OUTPUT, `tarball=${result.tarball}\nintegrity=${result.integrity}\n`);
+          JS
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: npm-package
+          path: ${{ steps.package.outputs.tarball }}
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: verify
+    if: github.event_name == 'release' || inputs.publish == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: npm-package
+          path: package
+
+      - name: Publish the verified tarball with npm trusted publishing
+        env:
+          NPM_DIST_TAG: ${{ needs.verify.outputs.channel }}
+          EXPECTED_INTEGRITY: ${{ needs.verify.outputs.integrity }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { readFileSync, readdirSync } from 'node:fs';
+          const [major, minor, patch] = execFileSync('npm', ['--version'], { encoding: 'utf8' }).trim().split('.').map(Number);
+          assert.ok(major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1))), 'npm >=11.5.1 is required for OIDC');
+          const files = readdirSync('package');
+          assert.equal(files.length, 1);
+          assert.ok(files[0].endsWith('.tgz'));
+          const tarball = `package/${files[0]}`;
+          const integrity = `sha512-${createHash('sha512').update(readFileSync(tarball)).digest('base64')}`;
+          assert.equal(integrity, process.env.EXPECTED_INTEGRITY);
+          assert.ok(['alpha', 'beta', 'rc', 'latest'].includes(process.env.NPM_DIST_TAG));
+          execFileSync('npm', ['publish', tarball, '--access', 'public', '--provenance', '--ignore-scripts', '--tag', process.env.NPM_DIST_TAG], { stdio: 'inherit' });
+          JS
