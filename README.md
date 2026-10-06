@@ -10,7 +10,7 @@ The [version-1 protocol specification](packages/nut-fountain/docs/protocol.md) i
 ## Install the library
 
 ```sh
-npm install nut-fountain@alpha
+npm install nut-fountain
 ```
 
 The library is ESM and experimental; APIs and wire compatibility may change. See the [library README](packages/nut-fountain/README.md) for usage. MIT license, copyright (c) 2026 Egge21M; third-party notices are retained in the package.

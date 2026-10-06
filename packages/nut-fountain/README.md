@@ -1,6 +1,6 @@
 # nut-fountain
 
-An experimental, browser-compatible TypeScript package for developing a binary fountain transport specification. It encodes arbitrary bytes into versioned binary fountain frames, reconstructs those bytes, and provides Cashu V4 helpers and an inbound UR reader. This is an alpha release; APIs and wire compatibility may change.
+An experimental, browser-compatible TypeScript package for developing a binary fountain transport specification. It encodes arbitrary bytes into versioned binary fountain frames, reconstructs those bytes, and provides Cashu V4 helpers and an inbound UR reader. APIs and wire compatibility may change before version 1.0.
 
 QR rendering and camera scanning live in the separate [device playground](https://github.com/Egge21M/nut-fountain/tree/main/apps/playground), outside this library. Wallet integration and comparative performance claims are outside this implementation. Its new dense GF(2) fountain protocol differs from the earlier POC; that POC's efficiency measurements do not establish this protocol's performance.
 
@@ -9,8 +9,8 @@ Read the [protocol specification](docs/protocol.md) for language-neutral interop
 ## Install
 
 ```sh
-npm install nut-fountain@alpha
-# or: bun add nut-fountain@alpha
+npm install nut-fountain
+# or: bun add nut-fountain
 ```
 
 ESM only. Supports modern browser bundlers and Node.js 22.4+; TypeScript consumers can use Bundler or NodeNext resolution. No TypeScript runtime dependency is required. QR rendering and camera access remain application responsibilities.
