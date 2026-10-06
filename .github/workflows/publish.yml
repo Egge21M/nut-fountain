@@ -111,7 +111,7 @@ jobs:
           const files = readdirSync('package');
           assert.equal(files.length, 1);
           assert.ok(files[0].endsWith('.tgz'));
-          const tarball = `package/${files[0]}`;
+          const tarball = `./package/${files[0]}`;
           const integrity = `sha512-${createHash('sha512').update(readFileSync(tarball)).digest('base64')}`;
           assert.equal(integrity, process.env.EXPECTED_INTEGRITY);
           execFileSync('npm', ['publish', tarball, '--access', 'public', '--provenance', '--ignore-scripts', '--tag', 'latest'], { stdio: 'inherit' });
